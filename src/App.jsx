@@ -1,16 +1,16 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-// 1. Importamos los Layouts
+// 1. Layouts
 import MainLayout from './components/layout/MainLayout';
 import AuthLayout from './components/layout/AuthLayout';
 
-// 2. Importamos las Páginas (Auth & Chofer)
+// 2. Páginas Auth & Chofer
 import Login from './pages/auth/Login';
 import EntregaMovil from './pages/Chofer/EntregaMovil';
 
-// 3. Importamos Páginas del Sistema (Admin)
-import Dashboard from './pages/Reportes/Dashboard'; // El Dashboard principal está en Reportes
+// 3. Páginas del Sistema (Admin/Ventas/Logística)
+import Dashboard from './pages/Reportes/Dashboard';
 import NuevoPedido from './pages/Ventas/NuevoPedido';
 import ListaPedidos from './pages/Ventas/ListaPedidos';
 import Planificador from './pages/Logistica/Planificador';
@@ -20,55 +20,52 @@ import NuevoReclamo from './pages/Reclamos/NuevoReclamo';
 import ListaReclamos from './pages/Reclamos/ListaReclamos';
 import ReporteVentas from './pages/Reportes/ReporteVentas';
 
-// 4. Importamos el CSS
-import './index.css';
+// 4. NUEVAS PÁGINAS (Clientes y Usuarios)
+import ListaClientes from './pages/Clientes/ListaClientes';
+import Usuarios from './pages/Admin/Usuarios';
 
 function App() {
     return (
         <BrowserRouter>
             <Routes>
 
-                {/* GRUPO 1: Rutas Públicas o Pantalla Completa (Sin Sidebar) */}
+                {/* Rutas Públicas / Pantalla Completa */}
                 <Route element={<AuthLayout />}>
                     <Route path="/login" element={<Login />} />
-                    {/* La vista del chofer usa este layout para parecer una App Móvil en el celular */}
                     <Route path="/chofer/entrega" element={<EntregaMovil />} />
                 </Route>
 
-
-                {/* GRUPO 2: Rutas Privadas del Sistema (Con Sidebar y Header) */}
+                {/* Rutas Privadas con Menú Lateral */}
                 <Route element={<MainLayout />}>
 
-                    {/* Dashboard Principal */}
                     <Route path="/dashboard" element={<Dashboard />} />
 
-                    {/* Subsistema de Ventas */}
+                    {/* Ventas y Clientes */}
                     <Route path="/ventas/nuevo" element={<NuevoPedido />} />
                     <Route path="/ventas/lista" element={<ListaPedidos />} />
-                    <Route path="/clientes" element={<div className="p-8 text-center text-gray-500">Módulo de Clientes (Similar a Lista de Pedidos)</div>} />
 
-                    {/* Subsistema de Logística */}
+                    {/* AQUÍ ESTABA EL ERROR, AHORA APUNTA AL COMPONENTE REAL: */}
+                    <Route path="/clientes" element={<ListaClientes />} />
+
+                    {/* Logística */}
                     <Route path="/logistica/planificacion" element={<Planificador />} />
                     <Route path="/logistica/despacho" element={<GuiaDespacho />} />
 
-                    {/* Subsistema de Almacén */}
+                    {/* Almacén */}
                     <Route path="/almacen/inventario" element={<Inventario />} />
 
-                    {/* Subsistema de Reclamos / Soporte */}
+                    {/* Soporte */}
                     <Route path="/reclamos" element={<ListaReclamos />} />
-                    <Route path="/reclamos/nuevo" element={<NuevoReclamo />} /> {/* Opcional si quieres acceso directo */}
+                    <Route path="/reclamos/nuevo" element={<NuevoReclamo />} />
 
-                    {/* Subsistema de Reportes */}
+                    {/* Reportes y Admin */}
                     <Route path="/reportes" element={<ReporteVentas />} />
+                    <Route path="/admin/usuarios" element={<Usuarios />} />
 
                 </Route>
 
-
-                {/* GRUPO 3: Redirección por defecto */}
-                {/* Si entran a la raíz "/", los mandamos al Login */}
+                {/* Redirecciones */}
                 <Route path="/" element={<Navigate to="/login" replace />} />
-
-                {/* Ruta 404 para cualquier url desconocida */}
                 <Route path="*" element={<Navigate to="/login" replace />} />
 
             </Routes>

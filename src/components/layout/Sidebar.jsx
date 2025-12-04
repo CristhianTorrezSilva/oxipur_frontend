@@ -1,13 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard, ShoppingCart, Truck, Package,
-    Users, FileText, MessageSquareWarning, Map, LogOut
+    Users, FileText, MessageSquareWarning, Map, LogOut, ShieldCheck
 } from 'lucide-react';
 
 const Sidebar = () => {
     const navigate = useNavigate();
-    // Leemos el rol guardado en el Login
     const rolUsuario = localStorage.getItem('userRole') || 'admin';
     const nombreUsuario = localStorage.getItem('userName') || 'Usuario';
 
@@ -16,12 +15,10 @@ const Sidebar = () => {
         navigate('/login');
     };
 
-    // DEFINICIÓN DE MENÚS POR ROL
-    // Aquí definimos qué ve cada uno según el documento
     const allMenuItems = [
         {
             path: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} />,
-            roles: ['admin', 'ventas', 'logistica'] // Almacén no necesita dashboard gerencial
+            roles: ['admin', 'ventas', 'logistica']
         },
 
         // SECCIÓN VENTAS
@@ -36,7 +33,7 @@ const Sidebar = () => {
         },
         {
             path: '/clientes', label: 'Cartera Clientes', icon: <Users size={20} />,
-            roles: ['admin', 'ventas'] // El cliente no ve otros clientes
+            roles: ['admin', 'ventas']
         },
 
         // SECCIÓN LOGÍSTICA
@@ -54,7 +51,7 @@ const Sidebar = () => {
         { section: 'ALMACÉN', roles: ['admin', 'almacen', 'logistica'] },
         {
             path: '/almacen/inventario', label: 'Inventario', icon: <Package size={20} />,
-            roles: ['admin', 'almacen', 'logistica'] // Logística necesita ver stock a veces
+            roles: ['admin', 'almacen', 'logistica']
         },
 
         // SECCIÓN SOPORTE
@@ -65,11 +62,18 @@ const Sidebar = () => {
         },
         {
             path: '/reportes', label: 'Reportes', icon: <FileText size={20} />,
-            roles: ['admin'] // Solo Admin ve reportes globales
+            roles: ['admin']
+        },
+
+        // --- AQUÍ ESTABA LO QUE FALTABA ---
+        // SECCIÓN ADMIN (Solo para el rol admin)
+        { section: 'ADMINISTRACIÓN', roles: ['admin'] },
+        {
+            path: '/admin/usuarios', label: 'Usuarios y Roles', icon: <ShieldCheck size={20} />,
+            roles: ['admin']
         },
     ];
 
-    // Filtramos el menú según el rol actual
     const menuFiltrado = allMenuItems.filter(item => item.roles.includes(rolUsuario));
 
     return (
@@ -115,7 +119,7 @@ const Sidebar = () => {
             <div className="p-4 border-t border-slate-800">
                 <div className="flex items-center justify-between p-2 bg-slate-800 rounded-lg">
                     <div className="flex items-center gap-2 overflow-hidden">
-                        <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center font-bold text-xs shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center font-bold text-xs shrink-0 uppercase">
                             {nombreUsuario.charAt(0)}
                         </div>
                         <div className="overflow-hidden">
@@ -123,7 +127,7 @@ const Sidebar = () => {
                             <p className="text-[10px] text-slate-400 truncate capitalize">{rolUsuario}</p>
                         </div>
                     </div>
-                    <button onClick={handleLogout} className="text-slate-400 hover:text-white p-1">
+                    <button onClick={handleLogout} className="text-slate-400 hover:text-white p-1" title="Cerrar Sesión">
                         <LogOut size={16} />
                     </button>
                 </div>
