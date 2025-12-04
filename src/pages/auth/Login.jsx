@@ -1,118 +1,80 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, ArrowRight } from 'lucide-react';
+import { User, Shield, Truck, Package, Users, Briefcase } from 'lucide-react';
 import Button from '../../components/ui/Button';
-import Input from '../../components/ui/Input';
-import Alert from '../../components/ui/Alert';
 
 const Login = () => {
     const navigate = useNavigate();
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(null);
 
-    const handleLogin = (e) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
+    // Función para simular el login según el rol
+    const handleRoleLogin = (rol, nombre, rutaInicial) => {
+        setLoading(rol);
 
-        // SIMULACIÓN DE LOGIN (Para la defensa)
+        // Guardamos en la "memoria" del navegador quién está logueado
+        localStorage.setItem('userRole', rol);
+        localStorage.setItem('userName', nombre);
+
         setTimeout(() => {
-            // 1. Si el usuario escribe algo relacionado a chofer, lo mandamos a la vista móvil
-            if (email.toLowerCase().includes('chofer')) {
-                navigate('/chofer/entrega');
-            }
-            // 2. Cualquier otro usuario entra al sistema administrativo
-            else if (email && password) {
-                navigate('/dashboard');
-            }
-            // 3. Validación simple
-            else {
-                setError('Por favor ingrese sus credenciales');
-                setLoading(false);
-            }
-        }, 1000); // Pequeño retraso para que parezca que "piensa"
+            navigate(rutaInicial);
+        }, 800);
     };
 
-    return (
-        <div className="flex flex-col items-center justify-center w-full">
-            {/* Tarjeta de Login */}
-            <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
+    const roles = [
+        { id: 'admin', label: 'Administrador', name: 'Admin General', icon: <Shield size={20}/>, route: '/dashboard', color: 'bg-slate-800 text-white' },
+        { id: 'ventas', label: 'Enc. Ventas', name: 'Carla Vendedora', icon: <Briefcase size={20}/>, route: '/ventas/lista', color: 'bg-blue-600 text-white' },
+        { id: 'logistica', label: 'Enc. Logística', name: 'Mario Logística', icon: <Truck size={20}/>, route: '/logistica/planificacion', color: 'bg-indigo-600 text-white' },
+        { id: 'almacen', label: 'Enc. Almacén', name: 'Pedro Almacén', icon: <Package size={20}/>, route: '/almacen/inventario', color: 'bg-orange-600 text-white' },
+        { id: 'cliente', label: 'Cliente', name: 'Clínica Incor', icon: <Users size={20}/>, route: '/ventas/lista', color: 'bg-green-600 text-white' },
+        { id: 'chofer', label: 'Conductor', name: 'Juan Chofer', icon: <Truck size={20}/>, route: '/chofer/entrega', color: 'bg-gray-400 text-white' },
+    ];
 
-                {/* Cabecera */}
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-blue-600 text-white text-2xl font-bold mb-4 shadow-lg shadow-blue-200">
-                        OX
+    return (
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+            <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 bg-white rounded-2xl shadow-xl overflow-hidden">
+
+                {/* Lado Izquierdo: Branding */}
+                <div className="bg-blue-900 p-12 text-white flex flex-col justify-center">
+                    <div className="w-16 h-16 bg-blue-500 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
+                        <span className="text-3xl font-bold">OX</span>
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-800">Bienvenido a OXIPUR</h2>
-                    <p className="text-gray-500 mt-2 text-sm">Sistema de Gestión de Pedidos y Distribución</p>
+                    <h1 className="text-4xl font-bold mb-2">OXIPUR S.R.L.</h1>
+                    <p className="text-blue-200 text-lg mb-8">Sistema de Gestión de Pedidos y Distribución de Oxígeno Medicinal.</p>
+                    <div className="text-sm text-blue-400 mt-auto">
+                        © 2025 Proyecto de Sistemas de Información
+                    </div>
                 </div>
 
-                {/* Formulario */}
-                <form onSubmit={handleLogin} className="space-y-6">
+                {/* Lado Derecho: Selector de Roles */}
+                <div className="p-1 flex flex-col justify-center">
+                    <h2 className="text-2xl font-bold text-black-800 mb-6 text-center">Seleccione un Rol para Ingresar</h2>
 
-                    {error && <Alert variant="error">{error}</Alert>}
-
-                    <div className="space-y-4">
-                        <Input
-                            label="Correo Electrónico"
-                            placeholder="admin@oxipur.bo"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            // Icono simulado dentro del input (opcional visualmente)
-                        />
-
-                        <div className="relative">
-                            <Input
-                                label="Contraseña"
-                                type="password"
-                                placeholder="••••••••"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                            />
-                            <div className="text-right mt-1">
-                                <a href="#" className="text-xs text-blue-600 hover:underline">¿Olvidaste tu contraseña?</a>
-                            </div>
-                        </div>
-                    </div>
-
-                    <Button
-                        type="submit"
-                        variant="primary"
-                        className="w-full h-12 text-lg shadow-lg shadow-blue-100"
-                        disabled={loading}
-                    >
-                        {loading ? 'Ingresando...' : 'Iniciar Sesión'}
-                        {!loading && <ArrowRight size={20} />}
-                    </Button>
-
-                </form>
-
-                {/* TRUCO PARA LA DEMO: Accesos Rápidos */}
-                <div className="mt-8 pt-6 border-t border-gray-100">
-                    <p className="text-xs text-center text-gray-400 uppercase font-bold mb-3">Accesos Directos (Demo)</p>
-                    <div className="grid grid-cols-2 gap-3">
-                        <button
-                            onClick={() => { setEmail('admin@oxipur.bo'); setPassword('123456'); }}
-                            className="text-xs p-2 bg-gray-50 hover:bg-gray-100 rounded text-gray-600 border transition-colors"
-                        >
-                            Soy Administrador
-                        </button>
-                        <button
-                            onClick={() => { setEmail('chofer@oxipur.bo'); setPassword('123456'); }}
-                            className="text-xs p-2 bg-gray-50 hover:bg-gray-100 rounded text-gray-600 border transition-colors"
-                        >
-                            Soy Chofer (Móvil)
-                        </button>
+                    <div className="grid grid-cols-1 gap-3">
+                        {roles.map((rol) => (
+                            <button
+                                key={rol.id}
+                                onClick={() => handleRoleLogin(rol.id, rol.name, rol.route)}
+                                disabled={loading !== null}
+                                className={`
+                  flex items-center gap-4 p-4 rounded-xl transition-all hover:scale-[1.02] active:scale-95 shadow-sm
+                  ${rol.color} hover:opacity-90
+                  ${loading === rol.id ? 'opacity-70 cursor-wait' : ''}
+                `}
+                            >
+                                <div className="bg-white/20 p-1 rounded-lg">
+                                    {rol.icon}
+                                </div>
+                                <div className="text-left">
+                                    <p className="font-bold text-white">{rol.label}</p>
+                                    <p className="text-white opacity-800">Ingresar como {rol.name}</p>
+                                </div>
+                                {loading === rol.id && <span className="ml-auto text-xs animate-pulse">Cargando...</span>}
+                            </button>
+                        ))}
                     </div>
                 </div>
 
             </div>
-
-            <p className="mt-8 text-center text-gray-400 text-sm">
-                &copy; 2025 OXIPUR S.R.L. - Versión 1.0.0
-            </p>
         </div>
     );
 };
