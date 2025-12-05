@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Eye, Check, X, Filter, Download, FileText, Copy, AlertCircle, Ban, Printer } from 'lucide-react';
+import { Eye, Check, X, Filter, Download, FileText, Copy, Ban, Printer, Upload, DollarSign } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
+import Modal from '../../components/ui/Modal';
+import Input from '../../components/ui/Input';
 import Alert from '../../components/ui/Alert';
 
 const ListaPedidos = () => {
@@ -11,18 +13,26 @@ const ListaPedidos = () => {
         { id: 'PED-001', cliente: 'Clínica Incor', fecha: '04/12/2025', cant: 20, tipo: 'Cilindro 6m3', estado: 'pendiente', urgencia: true, stockOk: true },
         { id: 'PED-002', cliente: 'Hospital Japonés', fecha: '04/12/2025', cant: 50, tipo: 'Cilindro 10m3', estado: 'validado', urgencia: false, stockOk: true },
         { id: 'PED-003', cliente: 'Centro Salud Norte', fecha: '03/12/2025', cant: 5, tipo: 'Portátil', estado: 'facturado', urgencia: true, stockOk: true },
-        { id: 'PED-005', cliente: 'Industrias Venado', fecha: '02/12/2025', cant: 150, tipo: 'Industrial', estado: 'bloqueado', urgencia: false, stockOk: false }, // CASO FALTA STOCK
+        { id: 'PED-005', cliente: 'Industrias Venado', fecha: '02/12/2025', cant: 150, tipo: 'Industrial', estado: 'bloqueado', urgencia: false, stockOk: false },
     ]);
+
+    const [modalFacturaOpen, setModalFacturaOpen] = useState(false);
+    const [selectedPedido, setSelectedPedido] = useState(null);
 
     // Simulaciones de acciones
     const handleAccion = (accion, id) => {
-        if (accion === 'facturar') alert(`Generando Factura Electrónica para ${id}...`);
-        if (accion === 'duplicar') alert(`Pedido ${id} duplicado con éxito. Se ha creado PED-NEW.`);
-        if (accion === 'cancelar') {
-            if(confirm("¿Seguro que desea cancelar este pedido antes del despacho?")) {
-                alert("Pedido Cancelado");
-            }
+        if (accion === 'facturar') {
+            setSelectedPedido(id);
+            setModalFacturaOpen(true);
         }
+        if (accion === 'duplicar') alert(`Pedido ${id} duplicado con éxito.`);
+        if (accion === 'cancelar' && confirm("¿Cancelar pedido?")) alert("Pedido Cancelado");
+    };
+
+    const handleConfirmarFactura = (e) => {
+        e.preventDefault();
+        alert(`Factura generada y comprobante asociado al pedido ${selectedPedido}`);
+        setModalFacturaOpen(false);
     };
 
     const getStatusBadge = (estado, urgencia, stockOk) => {
@@ -60,7 +70,7 @@ const ListaPedidos = () => {
                                 <TableHeader>Pedido</TableHeader>
                                 <TableHeader>Cliente</TableHeader>
                                 <TableHeader>Estado</TableHeader>
-                                <TableHeader>Acciones Rápidas</TableHeader>
+                                <TableHeader>Acciones</TableHeader>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -74,48 +84,25 @@ const ListaPedidos = () => {
                                     <TableCell>{getStatusBadge(p.estado, p.urgencia, p.stockOk)}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-1">
+                                            {!p.stockOk && <div className="text-red-600 text-xs font-bold flex gap-1"><Ban size={16}/> Sin Stock</div>}
 
-                                            {/* ACCIONES VARIABLES SEGÚN ESTADO */}
-
-                                            {/* Caso 1: Falta Stock (Bloqueado) */}
-                                            {!p.stockOk && (
-                                                <div className="flex items-center text-red-600 text-xs font-bold gap-1">
-                                                    <Ban size={16}/> Esperando Stock
-                                                </div>
-                                            )}
-
-                                            {/* Caso 2: Pendiente (Validar / Editar / Cancelar) */}
                                             {p.estado === 'pendiente' && p.stockOk && (
                                                 <>
-                                                    <button onClick={() => handleAccion('validar', p.id)} className="p-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200" title="Validar Pedido">
-                                                        <Check size={16} />
-                                                    </button>
-                                                    <button onClick={() => handleAccion('cancelar', p.id)} className="p-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200" title="Cancelar Pedido">
-                                                        <X size={16} />
-                                                    </button>
-                                                    <button className="p-1.5 text-gray-500 hover:bg-gray-100 rounded" title="Editar Pedido">
-                                                        <FileText size={16} />
-                                                    </button>
+                                                    <button onClick={() => handleAccion('validar', p.id)} className="p-1.5 bg-green-100 text-green-700 rounded"><Check size={16} /></button>
+                                                    <button onClick={() => handleAccion('cancelar', p.id)} className="p-1.5 bg-red-100 text-red-700 rounded"><X size={16} /></button>
                                                 </>
                                             )}
 
-                                            {/* Caso 3: Validado (Facturar / Duplicar) */}
                                             {p.estado === 'validado' && (
                                                 <>
                                                     <button onClick={() => handleAccion('facturar', p.id)} className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-bold hover:bg-blue-200">
-                                                        <Printer size={14}/> Facturar
+                                                        <DollarSign size={14}/> Facturar
                                                     </button>
-                                                    <button onClick={() => handleAccion('duplicar', p.id)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded" title="Duplicar Pedido">
-                                                        <Copy size={16} />
-                                                    </button>
+                                                    <button onClick={() => handleAccion('duplicar', p.id)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Copy size={16} /></button>
                                                 </>
                                             )}
 
-                                            {/* Botón Ver Detalle (Siempre visible) */}
-                                            <button className="p-1.5 text-gray-400 hover:text-blue-600 ml-1">
-                                                <Eye size={18} />
-                                            </button>
-
+                                            <button className="p-1.5 text-gray-400 hover:text-blue-600 ml-1"><Eye size={18} /></button>
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -124,6 +111,32 @@ const ListaPedidos = () => {
                     </Table>
                 </CardContent>
             </Card>
+
+            {/* MODAL PARA CASO DE USO 40 y 41: FACTURAR Y COMPROBANTE */}
+            <Modal isOpen={modalFacturaOpen} onClose={() => setModalFacturaOpen(false)} title={`Facturación: ${selectedPedido}`}>
+                <form onSubmit={handleConfirmarFactura} className="space-y-4">
+                    <Alert variant="info" title="Información Fiscal">
+                        Se generará la Factura N° 9901 y se enviará al SIN.
+                    </Alert>
+                    <div className="grid grid-cols-2 gap-4">
+                        <Input label="Razón Social" defaultValue="Hospital Japonés" />
+                        <Input label="NIT" defaultValue="102030444" />
+                    </div>
+
+                    {/* AQUÍ ESTÁ EL CASO DE USO 41: ASOCIAR COMPROBANTE */}
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50">
+                        <Upload className="mx-auto text-gray-400 mb-2" />
+                        <p className="text-sm font-bold text-gray-600">Adjuntar Comprobante de Pago / Voucher</p>
+                        <p className="text-xs text-gray-400">Transferencia Bancaria o Cheque</p>
+                        <button type="button" className="mt-2 text-xs text-blue-600 underline">Seleccionar Archivo</button>
+                    </div>
+
+                    <div className="flex justify-end gap-2 mt-4">
+                        <Button variant="secondary" onClick={() => setModalFacturaOpen(false)}>Cancelar</Button>
+                        <Button type="submit" variant="primary"><Printer size={18}/> Emitir y Asociar</Button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 };

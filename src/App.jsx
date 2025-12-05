@@ -18,7 +18,7 @@ import GuiaDespacho from './pages/Logistica/GuiaDespacho';
 import Inventario from './pages/Almacen/Inventario';
 import NuevoReclamo from './pages/Reclamos/NuevoReclamo';
 import ListaReclamos from './pages/Reclamos/ListaReclamos';
-import ReporteVentas from './pages/Reportes/ReporteVentas';
+import CentroReportes from './pages/Reportes/CentroReportes.jsx';
 
 // 4. NUEVAS PÁGINAS (Clientes y Usuarios)
 import ListaClientes from './pages/Clientes/ListaClientes';
@@ -59,7 +59,7 @@ function App() {
                     <Route path="/reclamos/nuevo" element={<NuevoReclamo />} />
 
                     {/* Reportes y Admin */}
-                    <Route path="/reportes" element={<ReporteVentas />} />
+                    <Route path="/reportes" element={<CentroReportes />} />
                     <Route path="/admin/usuarios" element={<Usuarios />} />
 
                 </Route>
