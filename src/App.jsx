@@ -19,6 +19,7 @@ import Inventario from './pages/Almacen/Inventario';
 import NuevoReclamo from './pages/Reclamos/NuevoReclamo';
 import ListaReclamos from './pages/Reclamos/ListaReclamos';
 import CentroReportes from './pages/Reportes/CentroReportes.jsx';
+import Zonas from './pages/Logistica/Zonas';
 
 // 4. NUEVAS PÁGINAS (Clientes y Usuarios)
 import ListaClientes from './pages/Clientes/ListaClientes';
@@ -50,6 +51,7 @@ function App() {
                     {/* Logística */}
                     <Route path="/logistica/planificacion" element={<Planificador />} />
                     <Route path="/logistica/despacho" element={<GuiaDespacho />} />
+                    <Route path="/logistica/zonas" element={<Zonas />} />
 
                     {/* Almacén */}
                     <Route path="/almacen/inventario" element={<Inventario />} />

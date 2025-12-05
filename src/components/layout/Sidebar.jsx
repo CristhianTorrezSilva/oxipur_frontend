@@ -46,6 +46,10 @@ const Sidebar = () => {
             path: '/logistica/despacho', label: 'Guías Despacho', icon: <Truck size={20} />,
             roles: ['admin', 'logistica']
         },
+        {
+            path: '/logistica/zonas', label: 'Config. Zonas', icon: <Map size={20} />,
+            roles: ['admin', 'logistica']
+        },
 
         // SECCIÓN ALMACÉN
         { section: 'ALMACÉN', roles: ['admin', 'almacen', 'logistica'] },
