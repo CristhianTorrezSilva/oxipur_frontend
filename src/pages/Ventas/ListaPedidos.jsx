@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, Check, X, Filter, Download, FileText, Copy, Ban, Printer, Upload, DollarSign } from 'lucide-react';
+import { Eye, Check, X, Filter, Download, FileText, Copy, Ban, Printer, Upload, DollarSign, PackageCheck } from 'lucide-react'; // Agregué PackageCheck
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
 import Badge from '../../components/ui/Badge';
@@ -9,6 +9,7 @@ import Input from '../../components/ui/Input';
 import Alert from '../../components/ui/Alert';
 
 const ListaPedidos = () => {
+    // Estado inicial de pedidos
     const [pedidos, setPedidos] = useState([
         { id: 'PED-001', cliente: 'Clínica Incor', fecha: '04/12/2025', cant: 20, tipo: 'Cilindro 6m3', estado: 'pendiente', urgencia: true, stockOk: true },
         { id: 'PED-002', cliente: 'Hospital Japonés', fecha: '04/12/2025', cant: 50, tipo: 'Cilindro 10m3', estado: 'validado', urgencia: false, stockOk: true },
@@ -21,12 +22,28 @@ const ListaPedidos = () => {
 
     // Simulaciones de acciones
     const handleAccion = (accion, id) => {
+        // CASO DE USO: RESERVAR STOCK PARA PEDIDO
+        if (accion === 'validar') {
+            // Simulamos el proceso del sistema descrito en el documento
+            const confirmacion = confirm(`¿Confirmar reserva de stock para el pedido ${id}? \n\nEl sistema marcará las cantidades como reservadas en almacén.`);
+            if (confirmacion) {
+                // Actualizamos el estado visualmente
+                const nuevosPedidos = pedidos.map(p =>
+                    p.id === id ? { ...p, estado: 'validado' } : p
+                );
+                setPedidos(nuevosPedidos);
+                alert("¡Éxito! Stock reservado y pedido validado para despacho.");
+            }
+        }
+
         if (accion === 'facturar') {
             setSelectedPedido(id);
             setModalFacturaOpen(true);
         }
         if (accion === 'duplicar') alert(`Pedido ${id} duplicado con éxito.`);
-        if (accion === 'cancelar' && confirm("¿Cancelar pedido?")) alert("Pedido Cancelado");
+        if (accion === 'cancelar' && confirm("¿Cancelar pedido? Se liberará el stock reservado.")) { // Ajuste en texto
+            alert("Pedido Cancelado y Stock Liberado");
+        }
     };
 
     const handleConfirmarFactura = (e) => {
@@ -41,7 +58,7 @@ const ListaPedidos = () => {
 
         switch (estado) {
             case 'pendiente': return <Badge variant="warning">Por Validar</Badge>;
-            case 'validado': return <Badge variant="info">Listo p/ Despacho</Badge>;
+            case 'validado': return <Badge variant="info">Stock Reservado</Badge>; // CAMBIO VISUAL CLAVE
             case 'facturado': return <Badge variant="success">Facturado</Badge>;
             case 'bloqueado': return <Badge variant="danger">Bloqueado</Badge>;
             default: return <Badge>{estado}</Badge>;
@@ -53,7 +70,7 @@ const ListaPedidos = () => {
             <div className="flex justify-between items-center">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-800">Gestión de Pedidos</h2>
-                    <p className="text-gray-500">Validación, facturación y seguimiento</p>
+                    <p className="text-gray-500">Validación, reserva de stock y facturación</p>
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline"><Download size={16}/> Reporte</Button>
@@ -86,10 +103,17 @@ const ListaPedidos = () => {
                                         <div className="flex items-center gap-1">
                                             {!p.stockOk && <div className="text-red-600 text-xs font-bold flex gap-1"><Ban size={16}/> Sin Stock</div>}
 
+                                            {/* BOTÓN DE VALIDAR / RESERVAR STOCK */}
                                             {p.estado === 'pendiente' && p.stockOk && (
                                                 <>
-                                                    <button onClick={() => handleAccion('validar', p.id)} className="p-1.5 bg-green-100 text-green-700 rounded"><Check size={16} /></button>
-                                                    <button onClick={() => handleAccion('cancelar', p.id)} className="p-1.5 bg-red-100 text-red-700 rounded"><X size={16} /></button>
+                                                    <button
+                                                        onClick={() => handleAccion('validar', p.id)}
+                                                        className="p-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                                                        title="Validar y Reservar Stock" // Tooltip Clave
+                                                    >
+                                                        <PackageCheck size={16} /> {/* Icono cambiado para representar Stock */}
+                                                    </button>
+                                                    <button onClick={() => handleAccion('cancelar', p.id)} className="p-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200"><X size={16} /></button>
                                                 </>
                                             )}
 
@@ -112,7 +136,7 @@ const ListaPedidos = () => {
                 </CardContent>
             </Card>
 
-            {/* MODAL PARA CASO DE USO 40 y 41: FACTURAR Y COMPROBANTE */}
+            {/* MODAL FACTURACIÓN */}
             <Modal isOpen={modalFacturaOpen} onClose={() => setModalFacturaOpen(false)} title={`Facturación: ${selectedPedido}`}>
                 <form onSubmit={handleConfirmarFactura} className="space-y-4">
                     <Alert variant="info" title="Información Fiscal">
@@ -123,7 +147,6 @@ const ListaPedidos = () => {
                         <Input label="NIT" defaultValue="102030444" />
                     </div>
 
-                    {/* AQUÍ ESTÁ EL CASO DE USO 41: ASOCIAR COMPROBANTE */}
                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50">
                         <Upload className="mx-auto text-gray-400 mb-2" />
                         <p className="text-sm font-bold text-gray-600">Adjuntar Comprobante de Pago / Voucher</p>
