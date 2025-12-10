@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Package, ArrowUpRight, ArrowDownLeft, AlertTriangle, RefreshCcw, Search, Download, FileText, Save, Truck } from 'lucide-react';
+import { Package, ArrowUpRight, ArrowDownLeft, AlertTriangle, RefreshCcw, Search, Download, FileText, Save, Factory, CheckCircle, Plus, Trash2, Truck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
 import Button from '../../components/ui/Button';
@@ -10,30 +10,72 @@ import Alert from '../../components/ui/Alert';
 
 const Inventario = () => {
     const [searchTerm, setSearchTerm] = useState('');
-    const [modalOpen, setModalOpen] = useState(false);
 
-    // Estado para el formulario
-    const [tipoAjuste, setTipoAjuste] = useState('entrada');
+    // MODALES
+    const [modalMovimientoOpen, setModalMovimientoOpen] = useState(false);
+    const [modalProduccionOpen, setModalProduccionOpen] = useState(false);
+
+    // ESTADOS FORMULARIO MANUAL
     const [motivo, setMotivo] = useState('');
+
+    // ESTADOS NUEVOS PARA "RECEPCIÓN MÚLTIPLE" (CARRITO DE PRODUCCIÓN)
+    const [itemsProduccion, setItemsProduccion] = useState([]);
+    const [tempProdId, setTempProdId] = useState('');
+    const [tempCant, setTempCant] = useState('');
 
     // DATOS MOCK
     const productos = [
         { id: 'O2-MED-6M3', nombre: 'Oxígeno Medicinal 6m3', tipo: 'Gas', stock: 145, capacidad: 200, vacios: 45, estado: 'optimo' },
         { id: 'O2-IND-10M3', nombre: 'Oxígeno Industrial 10m3', tipo: 'Gas', stock: 28, capacidad: 100, vacios: 60, estado: 'bajo' },
         { id: 'KIT-PORT', nombre: 'Kit Portátil (Mochila)', tipo: 'Equipo', stock: 12, capacidad: 50, vacios: 0, estado: 'critico' },
-        { id: 'VAL-REG', nombre: 'Válvula Reguladora', tipo: 'Accesorio', stock: 85, capacidad: 100, vacios: 0, estado: 'optimo' },
     ];
 
     const movimientos = [
-        { id: 1, tipo: 'entrada', concepto: 'Recarga Planta', cant: 50, fecha: '04/12/2025 08:00', usuario: 'Ops. Planta' },
+        { id: 1, tipo: 'entrada', concepto: 'Lote Prod #4402', cant: 50, fecha: '04/12/2025 08:00', usuario: 'Planta' },
         { id: 2, tipo: 'salida', concepto: 'Despacho Ruta Norte', cant: 30, fecha: '04/12/2025 08:30', usuario: 'J. Pérez' },
-        { id: 3, tipo: 'entrada', concepto: 'Devolución Ruta #234', cant: 15, fecha: '03/12/2025 16:45', usuario: 'Juan Chofer' }, // Ejemplo de devolución registrada
+        { id: 3, tipo: 'entrada', concepto: 'Devolución Ruta #234', cant: 15, fecha: '03/12/2025 16:45', usuario: 'Juan Chofer' },
     ];
 
+    // --- FUNCIONES DE CARRITO DE PRODUCCIÓN ---
+    const handleAddItem = () => {
+        if (!tempProdId || !tempCant || parseInt(tempCant) <= 0) return alert("Seleccione producto y cantidad válida");
+
+        const productoReal = productos.find(p => p.id === tempProdId);
+
+        const newItem = {
+            id: tempProdId,
+            nombre: productoReal.nombre,
+            cant: parseInt(tempCant)
+        };
+
+        setItemsProduccion([...itemsProduccion, newItem]);
+        setTempProdId('');
+        setTempCant('');
+    };
+
+    const handleRemoveItem = (id) => {
+        setItemsProduccion(itemsProduccion.filter(i => i.id !== id));
+    };
+
+    // ACCIÓN: Confirmar Recepción Masiva
+    const handleRecepcionPlanta = (e) => {
+        e.preventDefault();
+        if (itemsProduccion.length === 0) return alert("Debe agregar al menos un ítem al lote.");
+
+        const resumen = itemsProduccion.map(i => `${i.cant}x ${i.nombre}`).join('\n');
+
+        // MENSAJE PARA LA DOCENTE: CICLO CERRADO
+        alert(`¡RECEPCIÓN DE LOTE CONFIRMADA!\n\nDetalle ingresado:\n${resumen}\n\nACCIONES DEL SISTEMA:\n1. Stock de "Llenos" aumentado.\n2. Stock de "Vacíos" descontado automáticamente.\n3. Costo de producción calculado.`);
+
+        setItemsProduccion([]);
+        setModalProduccionOpen(false);
+    };
+
+    // ACCIÓN: Guardar Movimiento Manual
     const handleGuardarAjuste = (e) => {
         e.preventDefault();
-        alert("Movimiento registrado. Stock actualizado y trazabilidad guardada en bitácora.");
-        setModalOpen(false);
+        alert("Movimiento registrado correctamente.");
+        setModalMovimientoOpen(false);
     };
 
     return (
@@ -42,13 +84,16 @@ const Inventario = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-800">Control de Inventario</h2>
-                    <p className="text-gray-500">Gestión de stock, ajustes y auditoría</p>
+                    <p className="text-gray-500">Gestión de stock, reabastecimiento y auditoría</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline"><FileText size={18} /> PDF</Button>
-                    <Button variant="outline"><Download size={18} /> Excel</Button>
-                    <Button variant="primary" onClick={() => { setMotivo(''); setModalOpen(true); }}>
-                        <RefreshCcw size={18} /> Registrar Movimiento
+                    {/* BOTÓN REABASTECIMIENTO */}
+                    <Button variant="primary" className="bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-200" onClick={() => setModalProduccionOpen(true)}>
+                        <Factory size={18} /> Recepción de Planta
+                    </Button>
+
+                    <Button variant="outline" onClick={() => { setMotivo(''); setModalMovimientoOpen(true); }}>
+                        <RefreshCcw size={18} /> Ajustes / Devoluciones
                     </Button>
                 </div>
             </div>
@@ -58,7 +103,7 @@ const Inventario = () => {
                 <Card className="border-l-4 border-l-blue-500">
                     <CardContent className="flex items-center justify-between p-6">
                         <div>
-                            <p className="text-sm font-medium text-gray-500 uppercase">Stock Disponible</p>
+                            <p className="text-sm font-medium text-gray-500 uppercase">Stock Disponible (Llenos)</p>
                             <h3 className="text-3xl font-bold text-gray-800">270</h3>
                         </div>
                         <div className="p-3 bg-blue-100 rounded-full text-blue-600"><Package size={24} /></div>
@@ -109,7 +154,7 @@ const Inventario = () => {
                                     <TableRow>
                                         <TableHeader>Producto</TableHeader>
                                         <TableHeader>Disp. (Llenos)</TableHeader>
-                                        <TableHeader>Vacíos</TableHeader>
+                                        <TableHeader>Vacíos (Planta)</TableHeader>
                                         <TableHeader>Estado</TableHeader>
                                     </TableRow>
                                 </TableHead>
@@ -122,7 +167,7 @@ const Inventario = () => {
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-bold">{prod.stock}</span>
+                                                    <span className="font-bold text-blue-700">{prod.stock}</span>
                                                     <span className="text-xs text-gray-400">/ {prod.capacidad}</span>
                                                 </div>
                                                 <div className="w-24 h-1.5 bg-gray-100 rounded-full mt-1 overflow-hidden">
@@ -133,7 +178,9 @@ const Inventario = () => {
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                {prod.tipo === 'Gas' ? <span className="text-orange-600 font-medium">{prod.vacios} unid.</span> : <span className="text-gray-300">-</span>}
+                                                {prod.tipo === 'Gas' ?
+                                                    <span className="text-orange-600 font-bold bg-orange-50 px-2 py-0.5 rounded border border-orange-100">{prod.vacios}</span>
+                                                    : <span className="text-gray-300">-</span>}
                                             </TableCell>
                                             <TableCell>
                                                 {prod.estado === 'optimo' && <Badge variant="success">Normal</Badge>}
@@ -152,7 +199,7 @@ const Inventario = () => {
                 <div>
                     <Card className="h-full">
                         <CardHeader>
-                            <CardTitle className="text-sm uppercase text-gray-500">Auditoría de Movimientos</CardTitle>
+                            <CardTitle className="text-sm uppercase text-gray-500">Últimos Movimientos</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-6">
@@ -180,68 +227,111 @@ const Inventario = () => {
                 </div>
             </div>
 
-            {/* MODAL INTELIGENTE (CASO DE USO 14 y 58: DEVOLUCIÓN DE CILINDROS) */}
-            <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Registrar Movimiento / Devolución">
+            {/* MODAL 1: AJUSTES MANUALES */}
+            <Modal isOpen={modalMovimientoOpen} onClose={() => setModalMovimientoOpen(false)} title="Ajuste Manual / Devolución">
                 <form onSubmit={handleGuardarAjuste} className="space-y-4">
-
-                    {/* Selección de Motivo */}
                     <div className="flex flex-col gap-1">
-                        <label className="text-sm font-semibold text-gray-700">Motivo del Movimiento</label>
-                        <select
-                            className="p-2 border rounded-lg bg-white"
-                            required
-                            onChange={(e) => {
-                                setMotivo(e.target.value);
-                                // Si es devolución, automáticamente es una ENTRADA al almacén
-                                if (e.target.value === 'devolucion_ruta') setTipoAjuste('entrada');
-                            }}
-                        >
+                        <label className="text-sm font-semibold text-gray-700">Motivo</label>
+                        <select className="p-2 border rounded-lg bg-white" required onChange={(e) => setMotivo(e.target.value)}>
                             <option value="">Seleccione...</option>
-                            <option value="devolucion_ruta">Devolución de Ruta (Retorno Camión)</option>
-                            <option value="ajuste_auditoria">Ajuste por Auditoría</option>
+                            <option value="devolucion_ruta">Devolución de Ruta (Cilindros Vacíos)</option>
                             <option value="merma">Merma / Daño</option>
+                            <option value="ajuste">Ajuste Inventario</option>
                         </select>
                     </div>
-
-                    {/* LÓGICA CONDICIONAL VISUAL: SI ES DEVOLUCIÓN, PIDE LA GUÍA */}
                     {motivo === 'devolucion_ruta' && (
-                        <div className="animate-in fade-in slide-in-from-top-2">
-                            <Alert variant="info" title="Asociación de Entrega">
-                                Ingrese el número de Guía o Ruta para vincular la devolución.
-                            </Alert>
-                            <div className="mt-2">
-                                <Input label="N° Guía de Despacho / Ruta" placeholder="Ej: G-4582" icon={<Truck size={16}/>} />
-                            </div>
-                        </div>
+                        <Alert variant="info" title="Retorno de Envases">
+                            Estos cilindros ingresarán al inventario de <b>VACÍOS</b>.
+                        </Alert>
                     )}
-
-                    {/* Selección de Tipo (Deshabilitado si es devolución porque es fijo Entrada) */}
-                    <div className="flex gap-4 mb-2">
-                        <label className={`flex items-center gap-2 ${motivo === 'devolucion_ruta' ? 'opacity-100' : 'cursor-pointer'}`}>
-                            <input type="radio" name="tipo" checked={tipoAjuste === 'entrada'} onChange={() => setTipoAjuste('entrada')} disabled={motivo === 'devolucion_ruta'} />
-                            <span className="text-sm font-bold text-green-700">Entrada (Sumar al Stock)</span>
-                        </label>
-                        <label className={`flex items-center gap-2 ${motivo === 'devolucion_ruta' ? 'opacity-30' : 'cursor-pointer'}`}>
-                            <input type="radio" name="tipo" checked={tipoAjuste === 'salida'} onChange={() => setTipoAjuste('salida')} disabled={motivo === 'devolucion_ruta'} />
-                            <span className="text-sm font-bold text-red-700">Salida (Restar del Stock)</span>
-                        </label>
-                    </div>
-
                     <div className="flex flex-col gap-1">
-                        <label className="text-sm font-semibold text-gray-700">Producto / Cilindro</label>
-                        <select className="p-2 border rounded-lg bg-white" required>
-                            {productos.map(p => (
-                                <option key={p.id} value={p.id}>{p.nombre}</option>
-                            ))}
+                        <label className="text-sm font-semibold text-gray-700">Producto</label>
+                        <select className="p-2 border rounded-lg bg-white">
+                            {productos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
                         </select>
                     </div>
+                    <Input label="Cantidad" type="number" required />
+                    <div className="flex justify-end gap-2 mt-4">
+                        <Button variant="secondary" onClick={() => setModalMovimientoOpen(false)}>Cancelar</Button>
+                        <Button type="submit" variant="primary">Guardar</Button>
+                    </div>
+                </form>
+            </Modal>
 
-                    <Input label="Cantidad (Unidades)" type="number" placeholder="0" required />
+            {/* MODAL 2: RECEPCIÓN DE PLANTA (SOLUCIÓN COMPLETA) */}
+            <Modal isOpen={modalProduccionOpen} onClose={() => setModalProduccionOpen(false)} title="Recepción de Lote de Producción">
+                <form onSubmit={handleRecepcionPlanta} className="space-y-4">
+                    <Alert variant="success" className="bg-green-50 border-green-200">
+                        <CheckCircle size={16} className="text-green-600"/>
+                        Esta acción reabastecerá el stock disponible y descontará de vacíos.
+                    </Alert>
+
+                    <Input label="Código de Lote" placeholder="Ej: LOTE-2025-DIC-01" required />
+
+                    {/* SECCIÓN DE AGREGADO MÚLTIPLE */}
+                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <p className="text-xs font-bold text-gray-500 uppercase mb-2">Detalle de Productos Llenados</p>
+
+                        <div className="flex gap-2 items-end mb-2">
+                            <div className="flex-1">
+                                <label className="text-xs font-semibold text-gray-600">Producto</label>
+                                <select
+                                    className="w-full p-2 border rounded bg-white text-sm"
+                                    value={tempProdId}
+                                    onChange={(e) => setTempProdId(e.target.value)}
+                                >
+                                    <option value="">Seleccione...</option>
+                                    {productos.map(p => (
+                                        <option key={p.id} value={p.id}>{p.nombre}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="w-24">
+                                <label className="text-xs font-semibold text-gray-600">Cant.</label>
+                                <input
+                                    type="number"
+                                    className="w-full p-2 border rounded bg-white text-sm"
+                                    placeholder="0"
+                                    value={tempCant}
+                                    onChange={(e) => setTempCant(e.target.value)}
+                                />
+                            </div>
+                            <Button type="button" variant="primary" onClick={handleAddItem} className="h-[38px] w-[38px] p-0 flex items-center justify-center">
+                                <Plus size={18} />
+                            </Button>
+                        </div>
+
+                        {/* LISTA DE ITEMS A INGRESAR */}
+                        <div className="bg-white border rounded max-h-32 overflow-y-auto">
+                            {itemsProduccion.length === 0 ? (
+                                <p className="text-xs text-gray-400 text-center py-4">Agregue productos al lote...</p>
+                            ) : (
+                                <table className="w-full text-xs text-left">
+                                    <thead className="bg-gray-100 text-gray-500">
+                                    <tr><th className="p-2">Producto</th><th className="p-2 text-center">Cant.</th><th className="p-2"></th></tr>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                    {itemsProduccion.map((item, idx) => (
+                                        <tr key={idx}>
+                                            <td className="p-2">{item.nombre}</td>
+                                            <td className="p-2 text-center font-bold">{item.cant}</td>
+                                            <td className="p-2 text-right">
+                                                <button type="button" onClick={() => handleRemoveItem(item.id)} className="text-red-500 hover:bg-red-50 p-1 rounded">
+                                                    <Trash2 size={14}/>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </div>
 
                     <div className="flex justify-end gap-2 mt-4">
-                        <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>
-                        <Button type="submit" variant="primary">
-                            <Save size={18}/> {motivo === 'devolucion_ruta' ? 'Confirmar Devolución' : 'Guardar Ajuste'}
+                        <Button variant="secondary" onClick={() => setModalProduccionOpen(false)}>Cancelar</Button>
+                        <Button type="submit" variant="primary" className="bg-green-600 hover:bg-green-700" disabled={itemsProduccion.length === 0}>
+                            Confirmar Ingreso
                         </Button>
                     </div>
                 </form>

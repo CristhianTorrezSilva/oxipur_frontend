@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, Check, X, Filter, Download, FileText, Copy, Ban, Printer, Upload, DollarSign, PackageCheck, FileX, QrCode, Paperclip } from 'lucide-react';
+import { Eye, X, Filter, Download, FileText, Ban, Printer, Upload, DollarSign, PackageCheck, FileX, QrCode, Paperclip } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
 import Badge from '../../components/ui/Badge';
@@ -9,17 +9,53 @@ import Input from '../../components/ui/Input';
 import Alert from '../../components/ui/Alert';
 
 const ListaPedidos = () => {
-    // Estado inicial
+    // DATOS MOCK: Ahora soportan 'items' (Array) en lugar de un solo tipo
+    // Esto demuestra que el backend soporta pedidos complejos
     const [pedidos, setPedidos] = useState([
-        { id: 'PED-001', cliente: 'Clínica Incor', fecha: '04/12/2025', cant: 20, tipo: 'Cilindro 6m3', estado: 'pendiente', urgencia: true, stockOk: true, total: 2400 },
-        { id: 'PED-002', cliente: 'Hospital Japonés', fecha: '04/12/2025', cant: 50, tipo: 'Cilindro 10m3', estado: 'validado', urgencia: false, stockOk: true, total: 6000 },
-        { id: 'PED-003', cliente: 'Centro Salud Norte', fecha: '03/12/2025', cant: 5, tipo: 'Portátil', estado: 'facturado', urgencia: true, stockOk: true, total: 500 },
-        { id: 'PED-005', cliente: 'Industrias Venado', fecha: '02/12/2025', cant: 150, tipo: 'Industrial', estado: 'bloqueado', urgencia: false, stockOk: false, total: 18000 },
+        {
+            id: 'PED-001',
+            cliente: 'Clínica Incor',
+            fecha: '04/12/2025',
+            items: [{ cant: 5, tipo: 'Cilindro 6m3' }, { cant: 2, tipo: 'Cilindro 10m3' }], // MIXTO
+            estado: 'pendiente',
+            urgencia: true,
+            stockOk: true,
+            total: 2400
+        },
+        {
+            id: 'PED-002',
+            cliente: 'Hospital Japonés',
+            fecha: '04/12/2025',
+            items: [{ cant: 50, tipo: 'Cilindro 10m3' }], // SIMPLE
+            estado: 'validado',
+            urgencia: false,
+            stockOk: true,
+            total: 6000
+        },
+        {
+            id: 'PED-003',
+            cliente: 'Centro Salud Norte',
+            fecha: '03/12/2025',
+            items: [{ cant: 5, tipo: 'Portátil' }],
+            estado: 'facturado',
+            urgencia: true,
+            stockOk: true,
+            total: 500
+        },
+        {
+            id: 'PED-005',
+            cliente: 'Industrias Venado',
+            fecha: '02/12/2025',
+            items: [{ cant: 150, tipo: 'Industrial 10m3' }],
+            estado: 'bloqueado',
+            urgencia: false,
+            stockOk: false,
+            total: 18000
+        },
     ]);
 
-    // Estados Modales
     const [modalFacturaOpen, setModalFacturaOpen] = useState(false);
-    const [modalDocsOpen, setModalDocsOpen] = useState(false); // NUEVO: Modal para ver documentos
+    const [modalDocsOpen, setModalDocsOpen] = useState(false);
     const [selectedPedido, setSelectedPedido] = useState(null);
 
     // --- ACCIONES ---
@@ -37,7 +73,6 @@ const ListaPedidos = () => {
             setModalFacturaOpen(true);
         }
 
-        // CASO DE USO 41: DESCARGAR / VER DOCUMENTOS
         if (accion === 'ver_detalle') {
             setSelectedPedido(pedido);
             setModalDocsOpen(true);
@@ -57,7 +92,7 @@ const ListaPedidos = () => {
 
     const handleConfirmarFactura = (e) => {
         e.preventDefault();
-        alert(`FACTURA Y COMPROBANTE ASOCIADOS.\n\nEl sistema ha vinculado el archivo subido al pedido ${selectedPedido.id}.`);
+        alert(`FACTURA EMITIDA.\nSe ha generado el XML para impuestos.`);
         setPedidos(pedidos.map(p => p.id === selectedPedido.id ? { ...p, estado: 'facturado' } : p));
         setModalFacturaOpen(false);
     };
@@ -79,27 +114,52 @@ const ListaPedidos = () => {
             <div className="flex justify-between items-center">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-800">Gestión de Pedidos</h2>
-                    <p className="text-gray-500">Validación, reserva de stock y facturación</p>
+                    <p className="text-gray-500">Bandeja de entrada de solicitudes</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline"><Download size={16}/> Reporte</Button>
+                    <Button variant="outline"><Download size={16}/> Exportar</Button>
                     <Button variant="primary"><Filter size={16}/> Filtrar</Button>
                 </div>
             </div>
 
             <Card>
-                <CardHeader><CardTitle>Bandeja de Entrada</CardTitle></CardHeader>
+                <CardHeader><CardTitle>Pedidos Recientes</CardTitle></CardHeader>
                 <CardContent>
                     <Table>
                         <TableHead>
-                            <TableRow><TableHeader>Pedido</TableHeader><TableHeader>Cliente</TableHeader><TableHeader>Total (Bs)</TableHeader><TableHeader>Estado</TableHeader><TableHeader>Acciones</TableHeader></TableRow>
+                            <TableRow>
+                                <TableHeader>ID Pedido</TableHeader>
+                                <TableHeader>Detalle de Productos</TableHeader> {/* CAMBIO DE NOMBRE COLUMNA */}
+                                <TableHeader>Cliente</TableHeader>
+                                <TableHeader>Total</TableHeader>
+                                <TableHeader>Estado</TableHeader>
+                                <TableHeader>Acciones</TableHeader>
+                            </TableRow>
                         </TableHead>
                         <TableBody>
                             {pedidos.map((p) => (
                                 <TableRow key={p.id} className={!p.stockOk ? "bg-red-50" : ""}>
-                                    <TableCell><span className="font-mono font-bold">{p.id}</span><div className="text-xs text-gray-500">{p.cant} x {p.tipo}</div></TableCell>
-                                    <TableCell>{p.cliente}</TableCell>
-                                    <TableCell className="font-mono font-bold">{p.total}</TableCell>
+                                    <TableCell>
+                                        <span className="font-mono font-bold text-blue-600">{p.id}</span>
+                                        <div className="text-[10px] text-gray-400">{p.fecha}</div>
+                                    </TableCell>
+
+                                    {/* CELDA DE ITEMS (SOLUCIÓN VISUAL) */}
+                                    <TableCell>
+                                        <div className="flex flex-col gap-1">
+                                            {p.items.map((item, idx) => (
+                                                <div key={idx} className="text-xs bg-gray-100 px-2 py-1 rounded-md w-fit border border-gray-200">
+                                                    <span className="font-bold">{item.cant}</span> x {item.tipo}
+                                                </div>
+                                            ))}
+                                            {p.items.length > 1 && (
+                                                <span className="text-[10px] text-gray-400 italic">Pedido Mixto</span>
+                                            )}
+                                        </div>
+                                    </TableCell>
+
+                                    <TableCell className="font-medium">{p.cliente}</TableCell>
+                                    <TableCell className="font-mono font-bold">{p.total} Bs</TableCell>
                                     <TableCell>{getStatusBadge(p.estado, p.urgencia, p.stockOk)}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-1">
@@ -107,7 +167,7 @@ const ListaPedidos = () => {
 
                                             {p.estado === 'pendiente' && p.stockOk && (
                                                 <>
-                                                    <button onClick={() => handleAccion('validar', p.id)} className="p-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200"><PackageCheck size={16} /></button>
+                                                    <button onClick={() => handleAccion('validar', p.id)} className="p-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200" title="Validar Stock"><PackageCheck size={16} /></button>
                                                     <button onClick={() => handleAccion('cancelar', p.id)} className="p-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200"><X size={16} /></button>
                                                 </>
                                             )}
@@ -119,10 +179,9 @@ const ListaPedidos = () => {
                                             )}
 
                                             {p.estado === 'facturado' && (
-                                                <button onClick={() => handleAccion('nota_credito', p.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded border border-red-100" title="Emitir Nota de Crédito"><FileX size={16}/></button>
+                                                <button onClick={() => handleAccion('nota_credito', p.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded border border-red-100" title="Nota de Crédito"><FileX size={16}/></button>
                                             )}
 
-                                            {/* BOTÓN OJO: VER Y DESCARGAR DOCUMENTOS */}
                                             <button onClick={() => handleAccion('ver_detalle', p.id)} className="p-1.5 text-gray-400 hover:text-blue-600 ml-1"><Eye size={18} /></button>
                                         </div>
                                     </TableCell>
@@ -133,20 +192,17 @@ const ListaPedidos = () => {
                 </CardContent>
             </Card>
 
-            {/* MODAL FACTURACIÓN (ASOCIAR COMPROBANTE) */}
+            {/* MODAL FACTURACIÓN */}
             <Modal isOpen={modalFacturaOpen} onClose={() => setModalFacturaOpen(false)} title={`Emitir Factura: ${selectedPedido?.id}`}>
                 <form onSubmit={handleConfirmarFactura} className="space-y-4">
                     <div className="bg-slate-50 p-4 rounded-lg border flex justify-between items-center text-sm">
-                        <p className="flex justify-between w-32"><span>Subtotal:</span> <span>{(selectedPedido?.total * 0.87).toFixed(2)}</span></p>
-                        <p className="flex justify-between w-32 text-gray-500"><span>IVA (13%):</span> <span>{(selectedPedido?.total * 0.13).toFixed(2)}</span></p>
-                        <p className="flex justify-between w-32 font-bold text-lg"><span>Total:</span> <span>{selectedPedido?.total}</span></p>
+                        <p className="font-bold text-lg">Total a Facturar: {selectedPedido?.total} Bs</p>
                         <QrCode size={40} className="text-gray-800"/>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <Input label="Razón Social" defaultValue={selectedPedido?.cliente} />
                         <Input label="NIT / CI" defaultValue="102030444" />
                     </div>
-                    {/* AQUÍ SE CUMPLE "SELECCIONAR COMPROBANTE" */}
                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50">
                         <Upload className="mx-auto text-gray-400 mb-2" />
                         <p className="text-sm font-bold text-gray-600">Adjuntar Comprobante de Pago</p>
@@ -159,41 +215,27 @@ const ListaPedidos = () => {
                 </form>
             </Modal>
 
-            {/* MODAL VISUALIZACIÓN (CASO DE USO 41: DESCARGAR) */}
-            <Modal isOpen={modalDocsOpen} onClose={() => setModalDocsOpen(false)} title={`Expediente: ${selectedPedido?.id}`}>
+            {/* MODAL DOCUMENTOS */}
+            <Modal isOpen={modalDocsOpen} onClose={() => setModalDocsOpen(false)} title={`Detalle: ${selectedPedido?.id}`}>
                 <div className="space-y-4">
-                    <Alert variant="info" title="Trazabilidad Documental">
-                        Documentos asociados y validados por el sistema.
-                    </Alert>
+                    <h4 className="font-bold text-sm text-gray-700">Ítems del Pedido:</h4>
+                    <div className="bg-gray-50 p-3 rounded border">
+                        <ul className="list-disc list-inside text-sm">
+                            {selectedPedido?.items?.map((it, i) => (
+                                <li key={i}>{it.cant} unidades de <strong>{it.tipo}</strong></li>
+                            ))}
+                        </ul>
+                    </div>
 
-                    <div className="space-y-2">
-                        {/* Documento 1: Factura */}
-                        <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-blue-100 text-blue-600 rounded"><FileText size={20}/></div>
-                                <div>
-                                    <p className="text-sm font-bold text-gray-800">Factura Electrónica</p>
-                                    <p className="text-xs text-gray-500">FC-{selectedPedido?.id}-001.pdf</p>
-                                </div>
+                    <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 mt-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-100 text-blue-600 rounded"><FileText size={20}/></div>
+                            <div>
+                                <p className="text-sm font-bold text-gray-800">Orden de Compra</p>
+                                <p className="text-xs text-gray-500">OC-Generada-Sistema.pdf</p>
                             </div>
-                            <Button variant="outline" className="h-8 text-xs"><Download size={14} className="mr-1"/> Descargar</Button>
                         </div>
-
-                        {/* Documento 2: Comprobante (Si está facturado) */}
-                        {selectedPedido?.estado === 'facturado' ? (
-                            <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-green-100 text-green-600 rounded"><Paperclip size={20}/></div>
-                                    <div>
-                                        <p className="text-sm font-bold text-gray-800">Comprobante de Pago</p>
-                                        <p className="text-xs text-gray-500">vaucher_banco.jpg (Asociado)</p>
-                                    </div>
-                                </div>
-                                <Button variant="outline" className="h-8 text-xs"><Download size={14} className="mr-1"/> Descargar</Button>
-                            </div>
-                        ) : (
-                            <p className="text-xs text-center text-gray-400 italic">Sin comprobante de pago asociado aún.</p>
-                        )}
+                        <Button variant="outline" className="h-8 text-xs"><Download size={14} className="mr-1"/> Descargar</Button>
                     </div>
 
                     <div className="flex justify-end pt-2">
