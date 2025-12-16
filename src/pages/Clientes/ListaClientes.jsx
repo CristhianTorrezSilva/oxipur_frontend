@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { UserPlus, Search, Edit, Trash2, MapPin, Phone, FileText } from 'lucide-react';
+import { UserPlus, Search, Edit, Trash2, Phone } from 'lucide-react'; // Eliminé imports no usados para limpiar
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
-import Modal from '../../components/ui/Modal'; // Asegúrate de tener este componente
+import Modal from '../../components/ui/Modal';
 
 const ListaClientes = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingClient, setEditingClient] = useState(null);
+
+    // 1. ESTADO PARA EL BUSCADOR
+    const [searchTerm, setSearchTerm] = useState('');
 
     // MOCK DATA
     const clientes = [
@@ -16,6 +19,12 @@ const ListaClientes = () => {
         { id: 2, empresa: 'Hospital Obrero', nit: '5002001011', contacto: 'Lic. Perez', tel: '3-345000', zona: 'Centro', estado: 'Activo' },
         { id: 3, empresa: 'Juan Perez (Particular)', nit: '3453455', contacto: 'Juan Perez', tel: '600-99999', zona: 'Sur', estado: 'Inactivo' },
     ];
+
+    // 2. LÓGICA DE FILTRADO (Busca por Empresa O por NIT)
+    const clientesFiltrados = clientes.filter(cliente =>
+        cliente.empresa.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        cliente.nit.includes(searchTerm)
+    );
 
     const handleOpenModal = (cliente = null) => {
         setEditingClient(cliente);
@@ -43,8 +52,17 @@ const ListaClientes = () => {
             <Card>
                 <CardHeader className="flex flex-row justify-between items-center">
                     <CardTitle>Listado General</CardTitle>
-                    <div className="w-64">
-                        <Input placeholder="Buscar por NIT o Nombre..." className="mb-0" />
+                    <div className="w-64 relative">
+                        {/* 3. INPUT CONECTADO AL ESTADO */}
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                            <Search size={16} />
+                        </div>
+                        <Input
+                            placeholder="Buscar por NIT o Nombre..."
+                            className="mb-0 pl-10" // Agregué padding left para que no pise el ícono si quieres poner uno
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
                     </div>
                 </CardHeader>
                 <CardContent>
@@ -60,34 +78,43 @@ const ListaClientes = () => {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {clientes.map((c) => (
-                                <TableRow key={c.id}>
-                                    <TableCell className="font-bold">{c.empresa}</TableCell>
-                                    <TableCell className="font-mono">{c.nit}</TableCell>
-                                    <TableCell>
-                                        <div className="text-sm">{c.contacto}</div>
-                                        <div className="text-xs text-gray-400 flex items-center gap-1"><Phone size={10}/> {c.tel}</div>
-                                    </TableCell>
-                                    <TableCell>{c.zona}</TableCell>
-                                    <TableCell>
-                    <span className={`px-2 py-1 rounded text-xs font-bold ${c.estado === 'Activo' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                      {c.estado}
-                    </span>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => handleOpenModal(c)} className="p-1 text-blue-600 hover:bg-blue-50 rounded"><Edit size={18}/></button>
-                                            <button className="p-1 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button>
-                                        </div>
+                            {/* 4. RENDERIZAR LA LISTA FILTRADA EN LUGAR DE LA ORIGINAL */}
+                            {clientesFiltrados.length > 0 ? (
+                                clientesFiltrados.map((c) => (
+                                    <TableRow key={c.id}>
+                                        <TableCell className="font-bold">{c.empresa}</TableCell>
+                                        <TableCell className="font-mono">{c.nit}</TableCell>
+                                        <TableCell>
+                                            <div className="text-sm">{c.contacto}</div>
+                                            <div className="text-xs text-gray-400 flex items-center gap-1"><Phone size={10}/> {c.tel}</div>
+                                        </TableCell>
+                                        <TableCell>{c.zona}</TableCell>
+                                        <TableCell>
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${c.estado === 'Activo' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                            {c.estado}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => handleOpenModal(c)} className="p-1 text-blue-600 hover:bg-blue-50 rounded"><Edit size={18}/></button>
+                                                <button className="p-1 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                // Mensaje cuando no hay resultados
+                                <TableRow>
+                                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                                        No se encontraron clientes con ese criterio.
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )}
                         </TableBody>
                     </Table>
                 </CardContent>
             </Card>
 
-            {/* MODAL DE REGISTRO/EDICIÓN */}
             <Modal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}

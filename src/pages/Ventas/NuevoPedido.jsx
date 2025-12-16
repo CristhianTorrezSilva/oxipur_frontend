@@ -1,29 +1,41 @@
 import React, { useState } from 'react';
-import { Save, FileText, Search, AlertTriangle, Plus, Trash2, ShoppingCart } from 'lucide-react';
+import { Save, FileText, Search, AlertTriangle, Plus, Trash2, ShoppingCart, MapPin, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card.jsx';
 import Input from '../../components/ui/Input.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Alert from '../../components/ui/Alert.jsx';
 
 const NuevoPedido = () => {
-    // ESTADOS
+    // ESTADOS EXISTENTES
     const [esUrgente, setEsUrgente] = useState(false);
-
-    // ESTADO PARA EL "CARRITO" DE ITEMS (SOLUCIÓN A LA QUEJA DE LA DOCENTE)
     const [items, setItems] = useState([]);
-
-    // Estado temporal para el input actual
     const [tempProducto, setTempProducto] = useState('');
     const [tempCantidad, setTempCantidad] = useState(1);
 
-    // DICCIONARIO DE PRECIOS SIMULADOS
+    // --- NUEVOS ESTADOS PARA LOGÍSTICA (RESERVA Y GPS) ---
+    const [fechaReserva, setFechaReserva] = useState('');
+    const [direccion, setDireccion] = useState('');
+    const [coordenadas, setCoordenadas] = useState({ lat: null, lng: null });
+
+    // DICCIONARIO DE PRECIOS
     const precios = {
         '6m3': { nombre: 'Cilindro T-6m3 (Medicinal)', precio: 150 },
         '10m3': { nombre: 'Cilindro T-10m3 (Industrial)', precio: 280 },
         'portatil': { nombre: 'Kit Portátil (Mochila)', precio: 450 }
     };
 
-    // ACCIÓN: AGREGAR ITEM A LA LISTA
+    // --- NUEVA FUNCIÓN: SIMULAR GPS ---
+    const handleGetGPS = () => {
+        // Simulamos coordenadas entre 10 y 90 para que calcen en el mapa (0-100)
+        const lat = Math.floor(Math.random() * 80) + 10;
+        const lng = Math.floor(Math.random() * 80) + 10;
+
+        setCoordenadas({ lat, lng });
+        // Auto-rellenar la dirección si está vacía o actualizarla
+        setDireccion("Ubicación Detectada (Lat: " + lat + ", Lng: " + lng + ")");
+    };
+
+    // ACCIÓN: AGREGAR ITEM (TU LÓGICA ORIGINAL)
     const handleAddItem = () => {
         if (!tempProducto || tempCantidad <= 0) return alert("Seleccione un producto y cantidad válida");
 
@@ -31,7 +43,7 @@ const NuevoPedido = () => {
         const subtotal = productoInfo.precio * tempCantidad;
 
         const newItem = {
-            id: Date.now(), // ID temporal único
+            id: Date.now(),
             codigo: tempProducto,
             nombre: productoInfo.nombre,
             cantidad: parseInt(tempCantidad),
@@ -40,59 +52,113 @@ const NuevoPedido = () => {
         };
 
         setItems([...items, newItem]);
-
-        // Resetear inputs temporales
         setTempProducto('');
         setTempCantidad(1);
     };
 
-    // ACCIÓN: ELIMINAR ITEM
     const handleRemoveItem = (id) => {
         setItems(items.filter(item => item.id !== id));
     };
 
-    // CALCULAR TOTAL DEL PEDIDO
     const totalPedido = items.reduce((acc, item) => acc + item.subtotal, 0);
 
     const handleSubmit = (e) => {
         e.preventDefault();
+
+        // VALIDACIONES NUEVAS
+        if (!fechaReserva) return alert("Por favor, seleccione una Fecha de Reserva.");
+        if (!coordenadas.lat) return alert("Es obligatorio obtener las Coordenadas GPS para la ruta.");
         if (items.length === 0) return alert("Debe agregar al menos un ítem al pedido.");
 
-        alert(`¡Pedido Multiproducto Registrado! \nTotal a Pagar: Bs ${totalPedido}\n\nEl sistema ha generado la orden con ${items.length} líneas de detalle.`);
+        alert(`¡Pedido Registrado con Éxito!
+        
+        Fecha Reserva: ${fechaReserva}
+        Ubicación: [${coordenadas.lat}, ${coordenadas.lng}]
+        Total: Bs ${totalPedido}
+        
+        La orden pasará al Planificador de Rutas.`);
     };
 
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-800">Nuevo Pedido</h2>
-                    <p className="text-gray-500">Creación de orden de compra estandarizada</p>
+                    <h2 className="text-2xl font-bold text-gray-800">Formulario de Reserva y Pedido</h2>
+                    <p className="text-gray-500">Registro con geolocalización para optimización de ruta</p>
                 </div>
             </div>
 
             <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                {/* COLUMNA IZQUIERDA: Cliente y Selección de Productos */}
+                {/* COLUMNA IZQUIERDA */}
                 <div className="lg:col-span-2 space-y-6">
 
-                    {/* 1. Datos del Cliente */}
+                    {/* 1. Datos del Cliente + RESERVA + GPS (ACTUALIZADO) */}
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Search size={20} className="text-blue-600"/>
-                                Información del Cliente
+                                Datos de Reserva y Ubicación
                             </CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Input label="Buscar Cliente (NIT/Nombre)" placeholder="Ej: Clínica Incor..." />
                                 <Input label="Contacto Solicitante" placeholder="Dr. Juan Pérez" />
-                                <Input label="Dirección de Entrega" placeholder="Av. Doble Vía La Guardia, Km 5" className="md:col-span-2" />
+                            </div>
+
+                            {/* NUEVO: CAMPO DE FECHA DE RESERVA */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-sm font-semibold text-gray-700">Fecha de Entrega (Reserva)</label>
+                                    <div className="relative">
+                                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18}/>
+                                        <input
+                                            type="date"
+                                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                            value={fechaReserva}
+                                            onChange={(e) => setFechaReserva(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* NUEVO: BLOQUE DE GEOLOCALIZACIÓN */}
+                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mt-2">
+                                <label className="text-sm font-bold text-gray-700 mb-2 block">Dirección Georeferenciada</label>
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-red-500" size={18}/>
+                                        <input
+                                            type="text"
+                                            placeholder="Dirección o haga clic en Detectar GPS"
+                                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-white"
+                                            value={direccion}
+                                            onChange={(e) => setDireccion(e.target.value)}
+                                        />
+                                    </div>
+                                    <Button type="button" variant="outline" onClick={handleGetGPS} className="border-blue-300 text-blue-700 hover:bg-blue-50 whitespace-nowrap">
+                                        <MapPin size={16} className="mr-2"/> Detectar GPS
+                                    </Button>
+                                </div>
+
+                                {/* VISUALIZADOR DE COORDENADAS */}
+                                {coordenadas.lat && (
+                                    <div className="mt-2 flex items-center justify-between text-xs bg-white border px-3 py-2 rounded">
+                                        <span className="font-mono text-gray-600">
+                                            COORD: <b>X:{coordenadas.lat}</b> | <b>Y:{coordenadas.lng}</b>
+                                        </span>
+                                        <span className="text-green-600 font-bold flex items-center gap-1">
+                                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                            Ubicación Lista
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* 2. Selección de Productos (SOLUCIÓN PEDIDOS MIXTOS) */}
+                    {/* 2. Selección de Productos (TU CÓDIGO ORIGINAL INTACTO) */}
                     <Card className="border-blue-100 shadow-md">
                         <CardHeader className="bg-blue-50/50 pb-2">
                             <CardTitle className="flex items-center gap-2 text-blue-800">
@@ -130,13 +196,13 @@ const NuevoPedido = () => {
                                     type="button"
                                     onClick={handleAddItem}
                                     variant="primary"
-                                    className="mb-[2px]" // Ajuste visual
+                                    className="mb-[2px]"
                                 >
                                     <Plus size={18} className="mr-1"/> Agregar
                                 </Button>
                             </div>
 
-                            {/* TABLA DE ITEMS AGREGADOS */}
+                            {/* TABLA DE ITEMS */}
                             <div className="rounded-lg border border-gray-200 overflow-hidden">
                                 <table className="w-full text-sm text-left">
                                     <thead className="bg-gray-100 text-gray-700 font-bold uppercase text-xs">
@@ -175,7 +241,6 @@ const NuevoPedido = () => {
                                         ))
                                     )}
                                     </tbody>
-                                    {/* FOOTER CON TOTALES */}
                                     {items.length > 0 && (
                                         <tfoot className="bg-gray-50 border-t border-gray-200">
                                         <tr>
@@ -191,10 +256,8 @@ const NuevoPedido = () => {
                     </Card>
                 </div>
 
-                {/* COLUMNA DERECHA: Urgencia y Resumen */}
+                {/* COLUMNA DERECHA (TU CÓDIGO ORIGINAL INTACTO) */}
                 <div className="space-y-6">
-
-                    {/* Panel de Prioridad */}
                     <Card className={`border-2 ${esUrgente ? 'border-red-400 bg-red-50' : 'border-transparent'}`}>
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between mb-4">
@@ -222,7 +285,6 @@ const NuevoPedido = () => {
                         </CardContent>
                     </Card>
 
-                    {/* Resumen Final */}
                     <Card>
                         <CardHeader><CardTitle>Resumen de Orden</CardTitle></CardHeader>
                         <CardContent className="space-y-3">
