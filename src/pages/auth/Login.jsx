@@ -1,8 +1,23 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Lock, Smartphone, Key, User, ArrowRight, AlertCircle } from 'lucide-react';
+import { Shield, Lock, Smartphone, User, ArrowRight, AlertCircle } from 'lucide-react';
 import Button from '../../components/ui/Button';
-import Alert from '../../components/ui/Alert';
+
+// --- LÓGICA DE NEGOCIO Y SEGURIDAD ---
+
+// Base de datos simulada con las rutas corregidas según tu App.jsx
+const MOCK_DB = {
+    'admin': { role: 'admin', name: 'Admin General', route: '/dashboard' }, // Corregido: va a Dashboard
+    'ventas': { role: 'ventas', name: 'Carla Vendedora', route: '/ventas/lista' },
+    'logistica': { role: 'logistica', name: 'Mario Logística', route: '/logistica/planificacion' },
+    'almacen': { role: 'almacen', name: 'Pedro Almacén', route: '/almacen/inventario' },
+    'chofer': { role: 'chofer', name: 'Juan Chofer', route: '/chofer/entrega' }
+};
+
+// Función de sanitización (Pentesting: evitar XSS básico)
+const sanitizeInput = (input) => {
+    return input.replace(/[<>/'"();]/g, "").trim().toLowerCase();
+};
 
 const Login = () => {
     const navigate = useNavigate();
@@ -15,53 +30,54 @@ const Login = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    // DICCIONARIO DE ROLES (Oculto al usuario visualmente)
-    // Esto simula tu Base de Datos de usuarios
-    const MOCK_DB = {
-        'admin': { role: 'admin', name: 'Admin General', route: '/admin/usuarios' },
-        'ventas': { role: 'ventas', name: 'Carla Vendedora', route: '/ventas/lista' },
-        'logistica': { role: 'logistica', name: 'Mario Logística', route: '/logistica/planificacion' },
-        'almacen': { role: 'almacen', name: 'Pedro Almacén', route: '/almacen/inventario' },
-        'chofer': { role: 'chofer', name: 'Juan Chofer', route: '/chofer/entrega' }
-    };
-
-    // PASO 1: VALIDAR USUARIO Y CONTRASEÑA
+    // PASO 1: VALIDAR CREDENCIALES
     const handleLogin = (e) => {
         e.preventDefault();
         setError('');
+
+        // 1. Sanitización de entrada
+        const cleanUser = sanitizeInput(username);
+
+        if (!cleanUser || !password) {
+            return setError('Por favor complete todos los campos.');
+        }
+
         setLoading(true);
 
-        // Simulación de delay de red
+        // 2. Simulación de petición al Backend
         setTimeout(() => {
-            const userKey = username.toLowerCase().trim();
-            const userFound = MOCK_DB[userKey];
+            const userFound = MOCK_DB[cleanUser];
 
             if (userFound && password.length > 0) {
-                // Éxito: Pasamos a MFA
                 setLoading(false);
                 setStep('mfa');
             } else {
-                // Error genérico por seguridad (lo que le gusta a los docentes)
                 setLoading(false);
-                setError('Credenciales incorrectas. Intente nuevamente.');
+                // Pentesting Tip: Mensaje genérico para evitar enumeración de usuarios
+                setError('Credenciales inválidas o acceso no autorizado.');
             }
         }, 800);
     };
 
-    // PASO 2: VALIDAR MFA
+    // PASO 2: VALIDAR MULTI-FACTOR AUTH (MFA)
     const handleValidateMFA = (e) => {
         e.preventDefault();
-        if(mfaCode.length < 4) return alert("Código inválido");
+
+        // Validación básica de longitud
+        if(mfaCode.length < 4) return alert("Código inválido (mínimo 4 dígitos)");
 
         setLoading(true);
-        const userKey = username.toLowerCase().trim();
-        const userData = MOCK_DB[userKey];
-
-        // Guardar sesión simulada
-        localStorage.setItem('userRole', userData.role);
-        localStorage.setItem('userName', userData.name);
+        const cleanUser = sanitizeInput(username);
+        const userData = MOCK_DB[cleanUser];
 
         setTimeout(() => {
+            // --- FIX CRÍTICO: GUARDAR EL TOKEN QUE ESPERA APP.JSX ---
+            localStorage.setItem('oxipur_token', 'jwt_session_valid_secure_hash');
+
+            // Guardar datos de usuario para la UI
+            localStorage.setItem('userRole', userData.role);
+            localStorage.setItem('userName', userData.name);
+
             navigate(userData.route);
         }, 1000);
     };
@@ -70,7 +86,7 @@ const Login = () => {
         <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
             <div className="w-full max-w-[1000px] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row min-h-[600px]">
 
-                {/* Lado Izquierdo: Branding Institucional */}
+                {/* Lado Izquierdo: Branding Institucional (DISEÑO ORIGINAL) */}
                 <div className="lg:w-1/2 bg-gradient-to-br from-blue-900 to-blue-700 p-12 text-white flex flex-col justify-between relative overflow-hidden">
                     <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl"></div>
                     <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 bg-blue-400 opacity-10 rounded-full blur-3xl"></div>
@@ -93,7 +109,7 @@ const Login = () => {
                     </div>
                 </div>
 
-                {/* Lado Derecho: Formulario Estándar */}
+                {/* Lado Derecho: Formulario (LÓGICA ACTUALIZADA) */}
                 <div className="lg:w-1/2 p-12 bg-white flex flex-col justify-center">
 
                     {step === 'credentials' ? (
@@ -155,7 +171,7 @@ const Login = () => {
                                 </Button>
                             </form>
 
-                            {/* DEMO HINT - Puedes borrar esto para la presentación final si quieres, o dejarlo como "ayuda dev" */}
+                            {/* DEMO HINT - Mantenido para pruebas */}
                             <div className="mt-8 pt-6 border-t border-slate-100 text-center">
                                 <p className="text-xs text-slate-400 uppercase tracking-wider mb-2">Usuarios Demo (Dev Mode)</p>
                                 <div className="flex justify-center gap-2 text-xs text-slate-500 font-mono">

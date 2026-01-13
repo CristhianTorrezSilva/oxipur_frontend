@@ -1,192 +1,179 @@
 import React, { useState } from 'react';
-import { Navigation, MapPin, Package, RefreshCw, CheckCircle, Camera, ChevronRight, AlertTriangle, XCircle, ArrowLeft } from 'lucide-react';
+import { MapPin, Phone, CheckCircle, Clock, Navigation, Package, Camera } from 'lucide-react';
+import { Card, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 
-const EntregaMovil = () => {
-    const [paso, setPaso] = useState('ruta'); // 'ruta', 'formulario', 'incidencia', 'detalle_incidencia', 'completado'
-    const [firmado, setFirmado] = useState(false);
-    const [cantEntregada, setCantEntregada] = useState(5);
-    const [cantRecogida, setCantRecogida] = useState(5);
+// --- DATOS MOCK (Simulación de Backend) ---
+const INITIAL_ROUTE = [
+    {
+        id: 101,
+        cliente: 'Hospital Japonés',
+        direccion: 'Av. Japón 3er Anillo',
+        items: '5x Cilindros O2 (10m3)',
+        estado: 'pendiente',
+        lat: -17.76, lng: -63.18
+    },
+    {
+        id: 102,
+        cliente: 'Clínica Foianini',
+        direccion: 'Av. Irala esq. Chuquisaca',
+        items: '2x Kit Portátil',
+        estado: 'pendiente',
+        lat: -17.78, lng: -63.19
+    },
+    {
+        id: 103,
+        cliente: 'Consultorio Dr. Paz',
+        direccion: 'Calle Warnes #450',
+        items: '1x Cilindro O2 (6m3)',
+        estado: 'completado',
+        lat: -17.79, lng: -63.17
+    }
+];
 
-    // ESTADOS PARA INCIDENCIA (Caso de Uso 29)
-    const [motivoIncidencia, setMotivoIncidencia] = useState('');
-    const [fotoEvidencia, setFotoEvidencia] = useState(false);
+// --- SUB-COMPONENTES (Para mantener el código limpio) ---
 
-    const handleFinalizar = () => {
-        if (!firmado) return alert("Falta la firma del cliente");
-        setPaso('completado');
-    };
-
-    const handleSeleccionarMotivo = (motivo) => {
-        setMotivoIncidencia(motivo);
-        setPaso('detalle_incidencia'); // Vamos al paso de evidencia
-    };
-
-    const handleConfirmarIncidencia = () => {
-        if (!fotoEvidencia) return alert("Debe adjuntar evidencia fotográfica (Requisito del Sistema).");
-        alert(`INCIDENCIA REGISTRADA.\n\nMotivo: ${motivoIncidencia}\nEvidencia: Adjunta\nEstado: Alerta enviada a Logística y Ventas.`);
-        setPaso('ruta');
-        setFotoEvidencia(false);
+const StatusBadge = ({ estado }) => {
+    const styles = {
+        pendiente: "bg-yellow-100 text-yellow-700 border-yellow-200",
+        completado: "bg-green-100 text-green-700 border-green-200"
     };
 
     return (
-        <div className="min-h-screen bg-gray-100 flex justify-center font-sans">
-            <div className="w-full max-w-md bg-white min-h-screen shadow-xl flex flex-col">
+        <span className={`px-2 py-1 rounded-full text-xs font-bold border ${styles[estado] || styles.pendiente} uppercase tracking-wide flex items-center gap-1 w-fit`}>
+            {estado === 'completado' ? <CheckCircle size={12}/> : <Clock size={12}/>}
+            {estado}
+        </span>
+    );
+};
 
-                {/* Header App Móvil */}
-                <div className={`p-4 pt-8 flex justify-between items-center shadow-md text-white transition-colors ${paso.includes('incidencia') ? 'bg-red-600' : 'bg-blue-700'}`}>
-                    <div>
-                        <h1 className="font-bold text-lg">
-                            {paso === 'ruta' ? 'Ruta #234' :
-                                paso === 'formulario' ? 'Entrega en Curso' :
-                                    'Reportar Problema'}
-                        </h1>
-                        <p className="text-xs opacity-80">Camión: 2344-XTR</p>
-                    </div>
-                    <div className="text-right">
-                        <div className="text-2xl font-bold">09:15</div>
-                    </div>
+const OrderCard = ({ pedido, onEntregar }) => (
+    <Card className="mb-4 border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow">
+        <CardContent className="p-5">
+            <div className="flex justify-between items-start mb-3">
+                <div>
+                    <h3 className="font-bold text-gray-800 text-lg">{pedido.cliente}</h3>
+                    <p className="text-gray-500 text-sm flex items-center gap-1">
+                        <MapPin size={14} className="text-blue-500"/> {pedido.direccion}
+                    </p>
                 </div>
+                <StatusBadge estado={pedido.estado} />
+            </div>
 
-                <div className="flex-1 p-4 flex flex-col overflow-y-auto">
-
-                    {/* VISTA 1: NAVEGACIÓN */}
-                    {paso === 'ruta' && (
-                        <div className="space-y-6">
-                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-6 shadow-sm">
-                                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">Próxima Parada</p>
-                                <h2 className="text-2xl font-bold text-gray-800 leading-tight mb-2">Clínica Incor</h2>
-                                <div className="flex items-start gap-2 text-gray-600 mb-4">
-                                    <MapPin size={18} /> <p>Av. Banzer y 4to Anillo</p>
-                                </div>
-                                <div className="flex gap-3">
-                                    <Button variant="outline" className="flex-1 bg-white text-blue-700 border-blue-200"><Navigation size={18} /> Waze</Button>
-                                </div>
-                            </div>
-
-                            <div className="flex-1"></div>
-
-                            <div className="space-y-3 mt-auto">
-                                <Button onClick={() => setPaso('formulario')} className="w-full py-4 text-lg bg-green-600 hover:bg-green-700 shadow-lg">
-                                    Llegué al destino
-                                </Button>
-                                {/* BOTÓN CASO DE USO 29: INCIDENCIA */}
-                                <Button onClick={() => setPaso('incidencia')} variant="danger" className="w-full py-3 bg-red-50 text-red-700 border border-red-200 hover:bg-red-100">
-                                    <AlertTriangle size={18}/> No se pudo entregar
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* VISTA 2: FORMULARIO ENTREGA (Flujo Feliz) */}
-                    {paso === 'formulario' && (
-                        <div className="space-y-6">
-                            <Button variant="ghost" onClick={() => setPaso('ruta')} className="text-gray-500 pl-0"><ArrowLeft size={16}/> Volver</Button>
-
-                            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                                <label className="flex items-center gap-2 font-bold text-green-800 mb-4"><Package size={20}/> Entregados</label>
-                                <div className="flex items-center justify-between bg-white rounded-lg p-2 border shadow-sm">
-                                    <button onClick={() => setCantEntregada(c => Math.max(0, c-1))} className="w-12 h-12 bg-gray-100 text-2xl font-bold rounded">-</button>
-                                    <span className="text-3xl font-bold">{cantEntregada}</span>
-                                    <button onClick={() => setCantEntregada(c => c+1)} className="w-12 h-12 bg-green-100 text-green-600 text-2xl font-bold rounded">+</button>
-                                </div>
-                            </div>
-
-                            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
-                                <label className="flex items-center gap-2 font-bold text-orange-800 mb-4"><RefreshCw size={20}/> Recogidos (Vacíos)</label>
-                                <div className="flex items-center justify-between bg-white rounded-lg p-2 border shadow-sm">
-                                    <button onClick={() => setCantRecogida(c => Math.max(0, c-1))} className="w-12 h-12 bg-gray-100 text-2xl font-bold rounded">-</button>
-                                    <span className="text-3xl font-bold">{cantRecogida}</span>
-                                    <button onClick={() => setCantRecogida(c => c+1)} className="w-12 h-12 bg-orange-100 text-orange-600 text-2xl font-bold rounded">+</button>
-                                </div>
-                            </div>
-
-                            <div onClick={() => setFirmado(true)} className={`h-24 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer transition-colors ${firmado ? 'bg-blue-50 border-blue-500' : 'bg-gray-50 border-gray-300'}`}>
-                                {firmado ? <span className="text-blue-600 font-script text-2xl italic">Firma Recibida</span> : <span className="text-gray-400 flex items-center gap-2"><p>Toque para firmar</p></span>}
-                            </div>
-
-                            <Button onClick={handleFinalizar} disabled={!firmado} variant={firmado ? 'primary' : 'secondary'} className="w-full py-4 text-lg shadow-md">Confirmar Entrega</Button>
-                        </div>
-                    )}
-
-                    {/* VISTA 3: SELECCIONAR MOTIVO INCIDENCIA */}
-                    {paso === 'incidencia' && (
-                        <div className="space-y-4">
-                            <Button variant="ghost" onClick={() => setPaso('ruta')} className="text-gray-500 pl-0"><ArrowLeft size={16}/> Cancelar</Button>
-                            <h3 className="font-bold text-gray-800 text-lg px-1">Seleccione el motivo:</h3>
-                            {['Cliente Cerrado / No contesta', 'Dirección Incorrecta', 'Acceso Bloqueado', 'Cliente Rechaza Pedido', 'Falla Mecánica', 'Fuerza Mayor (Clima/Bloqueo)'].map(motivo => (
-                                <button key={motivo} onClick={() => handleSeleccionarMotivo(motivo)}
-                                        className="w-full p-4 bg-white border border-gray-200 rounded-xl text-left font-semibold text-gray-700 hover:bg-red-50 hover:border-red-300 flex justify-between items-center shadow-sm transition-all active:scale-95">
-                                    {motivo} <ChevronRight size={20} className="text-gray-400"/>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* VISTA 4: DETALLE Y EVIDENCIA (AQUÍ ESTÁ LO QUE PIDE EL DOC) */}
-                    {paso === 'detalle_incidencia' && (
-                        <div className="space-y-6">
-                            <div className="bg-red-50 p-4 rounded-xl border border-red-100">
-                                <p className="text-xs text-red-500 font-bold uppercase">Motivo Seleccionado</p>
-                                <p className="text-lg font-bold text-red-800">{motivoIncidencia}</p>
-                            </div>
-
-                            {/* 1. CAPTURA DE EVIDENCIA */}
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Evidencia Fotográfica (Obligatorio)</label>
-                                <div
-                                    onClick={() => setFotoEvidencia(true)}
-                                    className={`h-32 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${fotoEvidencia ? 'bg-gray-800 border-gray-800' : 'bg-gray-50 border-gray-300 hover:bg-gray-100'}`}
-                                >
-                                    {fotoEvidencia ? (
-                                        <div className="relative w-full h-full flex items-center justify-center">
-                                            <img src="https://placehold.co/400x300/333/999?text=FOTO+EVIDENCIA" alt="Evidencia" className="w-full h-full object-cover rounded-lg opacity-50" />
-                                            <CheckCircle className="absolute text-white w-12 h-12" />
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <Camera size={32} className="text-gray-400 mb-2"/>
-                                            <span className="text-sm text-gray-500">Tomar Foto</span>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* 2. CANTIDADES AFECTADAS / OBSERVACIONES */}
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Observaciones / Cantidad Afectada</label>
-                                <textarea
-                                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm"
-                                    rows="3"
-                                    placeholder="Ej: Pedido rechazado totalmente. 10 cilindros retornan a planta."
-                                ></textarea>
-                            </div>
-
-                            <div className="flex gap-3 pt-4">
-                                <Button variant="secondary" onClick={() => setPaso('incidencia')} className="flex-1">Atrás</Button>
-                                <Button variant="danger" onClick={handleConfirmarIncidencia} className="flex-[2] bg-red-600 text-white shadow-lg shadow-red-200">
-                                    Confirmar Incidencia
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* VISTA 5: COMPLETADO */}
-                    {paso === 'completado' && (
-                        <div className="flex flex-col items-center justify-center h-full space-y-8 animate-in zoom-in">
-                            <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center">
-                                <CheckCircle size={60} className="text-green-600" />
-                            </div>
-                            <div className="text-center">
-                                <h2 className="text-2xl font-bold text-gray-800">¡Entrega Exitosa!</h2>
-                                <p className="text-gray-500">Datos sincronizados con central.</p>
-                            </div>
-                            <Button onClick={() => { setPaso('ruta'); setFirmado(false); }} variant="primary" className="w-full py-4 text-lg shadow-lg">Siguiente Parada</Button>
-                        </div>
-                    )}
-
+            <div className="bg-slate-50 p-3 rounded-lg mb-4 border border-slate-100">
+                <div className="flex items-center gap-2 text-sm text-gray-700 font-medium">
+                    <Package size={16} className="text-slate-400"/>
+                    {pedido.items}
                 </div>
             </div>
+
+            {pedido.estado === 'pendiente' && (
+                <div className="grid grid-cols-2 gap-3">
+                    <Button variant="outline" className="text-xs h-10 border-blue-200 text-blue-700 hover:bg-blue-50">
+                        <Navigation size={16} className="mr-2"/> GPS
+                    </Button>
+                    <Button
+                        onClick={() => onEntregar(pedido.id)}
+                        className="text-xs h-10 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200"
+                    >
+                        <CheckCircle size={16} className="mr-2"/> Confirmar
+                    </Button>
+                </div>
+            )}
+
+            {pedido.estado === 'completado' && (
+                <div className="w-full bg-green-50 text-green-700 text-center py-2 rounded text-xs font-bold border border-green-100">
+                    Entrega Validada Digitalmente
+                </div>
+            )}
+        </CardContent>
+    </Card>
+);
+
+// --- COMPONENTE PRINCIPAL ---
+
+const EntregaMovil = () => {
+    const [pedidos, setPedidos] = useState(INITIAL_ROUTE);
+    const [tab, setTab] = useState('ruta'); // 'ruta' | 'historial'
+
+    // Lógica de negocio: Cambio de estado con validación simulada
+    const handleConfirmarEntrega = (id) => {
+        if (!window.confirm("¿Confirmar entrega en ubicación actual? \n(Se registrarán coordenadas GPS)")) return;
+
+        setPedidos(prev => prev.map(p =>
+            p.id === id ? { ...p, estado: 'completado' } : p
+        ));
+    };
+
+    // Filtros derivados (Clean Code: Evitar múltiples estados para listas)
+    const pendientes = pedidos.filter(p => p.estado === 'pendiente');
+    const completados = pedidos.filter(p => p.estado === 'completado');
+
+    return (
+        <div className="min-h-screen bg-slate-100 pb-20">
+            {/* Header Móvil */}
+            <div className="bg-blue-700 text-white p-6 rounded-b-[2rem] shadow-xl relative overflow-hidden">
+                <div className="relative z-10">
+                    <h1 className="text-2xl font-bold">Ruta #405</h1>
+                    <p className="text-blue-200 text-sm">Chofer: Juan Pérez | Camión: Nissan Cóndor</p>
+
+                    <div className="mt-4 flex gap-4 text-sm font-medium">
+                        <div className="bg-white/10 px-3 py-1 rounded-lg backdrop-blur-sm">
+                            📦 {pendientes.length} Pendientes
+                        </div>
+                        <div className="bg-white/10 px-3 py-1 rounded-lg backdrop-blur-sm">
+                            ✅ {completados.length} Listos
+                        </div>
+                    </div>
+                </div>
+                {/* Decoración de fondo */}
+                <div className="absolute top-0 right-0 -mt-4 -mr-4 w-32 h-32 bg-white/10 rounded-full blur-xl"></div>
+            </div>
+
+            {/* Contenedor Principal */}
+            <div className="p-4 -mt-6">
+
+                {/* Tabs de Navegación */}
+                <div className="flex bg-white rounded-xl p-1 shadow-md mb-6">
+                    <button
+                        onClick={() => setTab('ruta')}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${tab === 'ruta' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-400'}`}
+                    >
+                        Ruta Activa
+                    </button>
+                    <button
+                        onClick={() => setTab('historial')}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${tab === 'historial' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-400'}`}
+                    >
+                        Historial
+                    </button>
+                </div>
+
+                {/* Lista de Pedidos */}
+                <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
+                    {tab === 'ruta' ? (
+                        pendientes.length > 0 ? (
+                            pendientes.map(pedido => (
+                                <OrderCard key={pedido.id} pedido={pedido} onEntregar={handleConfirmarEntrega} />
+                            ))
+                        ) : (
+                            <div className="text-center py-10 text-gray-400">
+                                <CheckCircle size={48} className="mx-auto mb-2 text-green-400 opacity-50"/>
+                                <p>¡Ruta completada con éxito!</p>
+                            </div>
+                        )
+                    ) : (
+                        completados.map(pedido => (
+                            <OrderCard key={pedido.id} pedido={pedido} />
+                        ))
+                    )}
+                </div>
+            </div>
+
+            {/* Botón Flotante SOS (Detalle de seguridad) */}
+            <button className="fixed bottom-4 right-4 bg-red-600 text-white p-4 rounded-full shadow-lg hover:bg-red-700 transition-colors z-50">
+                <Phone size={24} />
+            </button>
         </div>
     );
 };

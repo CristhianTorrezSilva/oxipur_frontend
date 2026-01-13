@@ -1,485 +1,393 @@
 import React, { useState, useMemo } from 'react';
-import { Map, Zap, Calendar, CheckSquare, Settings, User, Ban, Filter, RefreshCw, Wrench, UserX, Truck, Navigation, X, Flag } from 'lucide-react';
+import {
+    Settings, User, Truck, Navigation, Flag,
+    Wrench, UserX, UserCheck, Zap, Calendar, X
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import RouteTimeline from '../../components/logistic/RouteTimeline';
 
-// --- COMPONENTE MODAL DE CONFIGURACIÓN ---
-const ConfigPanel = ({ config, setConfig, onClose }) => {
-    const handleChange = (key, value) => {
-        setConfig({ ...config, [key]: parseInt(value) || 0 });
-    };
-    return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-            <div className="bg-white p-6 rounded-xl shadow-2xl w-96 border border-blue-200 animate-in fade-in zoom-in-95">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold text-gray-800 flex items-center gap-2"><Settings size={18}/> Parametrización Logística</h3>
-                    <button onClick={onClose}><X size={18} className="text-gray-400 hover:text-red-500"/></button>
-                </div>
-                <p className="text-xs text-gray-500 mb-4">Ajuste la ponderación volumétrica (puntos de carga) para el algoritmo de capacidad.</p>
-                <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                        <label className="text-sm font-medium">Peso Cil. 10m3</label>
-                        <input type="number" value={config.peso10m3} onChange={(e) => handleChange('peso10m3', e.target.value)} className="w-20 p-1 border rounded text-right font-mono"/>
-                    </div>
-                    <div className="flex justify-between items-center">
-                        <label className="text-sm font-medium">Peso Cil. 6m3</label>
-                        <input type="number" value={config.peso6m3} onChange={(e) => handleChange('peso6m3', e.target.value)} className="w-20 p-1 border rounded text-right font-mono"/>
-                    </div>
-                    <div className="flex justify-between items-center">
-                        <label className="text-sm font-medium">Peso Portátil</label>
-                        <input type="number" value={config.pesoPortatil} onChange={(e) => handleChange('pesoPortatil', e.target.value)} className="w-20 p-1 border rounded text-right font-mono"/>
-                    </div>
-                </div>
-                <div className="mt-6 pt-4 border-t flex justify-end">
-                    <Button variant="primary" onClick={onClose}>Aplicar Cambios</Button>
-                </div>
-            </div>
-        </div>
-    );
+// --- UTILS: LÓGICA DE NEGOCIO ---
+
+const INITIAL_WEIGHT_CONFIG = {
+    peso10m3: 40,
+    peso6m3: 25,
+    pesoPortatil: 10
 };
 
+const calculateOrderWeight = (order, config) => {
+    const weights = {
+        '10m3': config.peso10m3,
+        '6m3': config.peso6m3,
+        'Portatil': config.pesoPortatil
+    };
+    const unitWeight = weights[order.tipo] || 0;
+    return order.cant * unitWeight;
+};
+
+// Algoritmo Nearest Neighbor
+const optimizeRoute = (selectedIds, allOrders, hubCoords = { x: 50, y: 50 }) => {
+    let pending = allOrders.filter(p => selectedIds.includes(p.id));
+    let currentPos = hubCoords;
+    let orderedRoute = [];
+    let totalDistance = 0;
+
+    while (pending.length > 0) {
+        pending.sort((a, b) => {
+            const distA = Math.hypot(a.coords.x - currentPos.x, a.coords.y - currentPos.y);
+            const distB = Math.hypot(b.coords.x - currentPos.x, b.coords.y - currentPos.y);
+            return distA - distB;
+        });
+
+        const next = pending.shift();
+        totalDistance += Math.hypot(next.coords.x - currentPos.x, next.coords.y - currentPos.y);
+        orderedRoute.push(next);
+        currentPos = next.coords;
+    }
+    totalDistance += Math.hypot(hubCoords.x - currentPos.x, hubCoords.y - currentPos.y);
+    return { steps: orderedRoute, distance: Math.round(totalDistance) };
+};
+
+// --- SUB-COMPONENTES ---
+
+const ConfigModal = ({ config, onSave, onClose }) => (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in">
+        <Card className="w-96 border-blue-200 shadow-2xl">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-md flex items-center gap-2"><Settings size={18}/> Configuración</CardTitle>
+                <button onClick={onClose}><X size={18} className="text-gray-400 hover:text-red-500"/></button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {Object.keys(config).map(key => (
+                    <div key={key} className="flex justify-between items-center">
+                        <label className="text-sm capitalize">{key.replace('peso', 'Peso ')}</label>
+                        <input
+                            type="number"
+                            className="w-20 p-1 border rounded text-right"
+                            value={config[key]}
+                            onChange={(e) => onSave(key, e.target.value)}
+                        />
+                    </div>
+                ))}
+                <Button variant="primary" className="w-full mt-4" onClick={onClose}>Aplicar</Button>
+            </CardContent>
+        </Card>
+    </div>
+);
+
+// --- COMPONENTE PRINCIPAL ---
+
 const Planificador = () => {
-    // ESTADOS
-    const [selectedVehicle, setSelectedVehicle] = useState(null);
-    const [selectedDriver, setSelectedDriver] = useState('');
-    const [selectedOrders, setSelectedOrders] = useState([]);
-    const [rutaGenerada, setRutaGenerada] = useState(false);
-    const [filtroZona, setFiltroZona] = useState('Todas');
-
-    // ESTADOS DE INGENIERÍA
-    const [showConfig, setShowConfig] = useState(false);
-    const [rutaCalculada, setRutaCalculada] = useState(null);
-    const [isEditingCap, setIsEditingCap] = useState(null);
-
-    // CONFIGURACIÓN DE PESOS
-    const [configPuntos, setConfigPuntos] = useState({
-        peso10m3: 40,
-        peso6m3: 25,
-        pesoPortatil: 10
-    });
-
-    // MOCK: VEHÍCULOS
+    // 1. Estados de Datos
     const [vehiculos, setVehiculos] = useState([
-        { id: 1, placa: "2344-XTR", cap: 1000, modelo: "Nissan Atlas (Mediano)", estado: "disponible" },
-        { id: 2, placa: "4055-BBN", cap: 2500, modelo: "Volvo FH (Grande)", estado: "disponible" },
-        { id: 3, placa: "1099-LPO", cap: 800, modelo: "Suzuki Carry (Pequeño)", estado: "mantenimiento" },
+        { id: 1, placa: "2344-XTR", cap: 1000, modelo: "Nissan Atlas", estado: "disponible" },
+        { id: 2, placa: "4055-BBN", cap: 2500, modelo: "Volvo FH", estado: "disponible" },
+        { id: 3, placa: "1099-LPO", cap: 800, modelo: "Suzuki Carry", estado: "mantenimiento" },
     ]);
 
-    // MOCK: CONDUCTORES
     const [conductores, setConductores] = useState([
         { id: 'C01', nombre: 'Juan Pérez', estado: 'Libre' },
         { id: 'C02', nombre: 'Carlos Mamani', estado: 'Libre' },
-        { id: 'C03', nombre: 'Roberto Gomez', estado: 'Vacaciones' },
+        { id: 'C03', nombre: 'Roberto Gomez', estado: 'Baja Médica' }, // Ejemplo inicial
     ]);
 
-    // MOCK: PEDIDOS CON COORDENADAS (0-100 para el plano cartesiano)
-    const pedidosPendientes = [
-        { id: "PED-999", cliente: "Farmacia 24h", zona: "Norte", tipo: "10m3", cant: 5, coords: { x: 20, y: 30 }, desc: "5x Cilindros 10m3", motivo: "Cliente Cerrado", prio: "repro" },
-        { id: "PED-104", cliente: "Clínica Incor", zona: "Norte", tipo: "10m3", cant: 20, coords: { x: 30, y: 60 }, desc: "20x Cilindros 10m3", prio: "alta" },
-        { id: "PED-105", cliente: "Hospital Obrero", zona: "Centro", tipo: "10m3", cant: 40, coords: { x: 60, y: 80 }, desc: "40x Cilindros 10m3", prio: "media" },
-        { id: "PED-106", cliente: "Consultorio Norte", zona: "Norte", tipo: "Portatil", cant: 10, coords: { x: 30, y: 20 }, desc: "10x Portátiles", prio: "baja" },
-        { id: "PED-107", cliente: "Particular - Juan", zona: "Sur", tipo: "6m3", cant: 10, coords: { x: 80, y: 20 }, desc: "10x Cilindros 6m3", prio: "baja" },
-    ];
+    const [pedidos] = useState([
+        { id: "PED-999", cliente: "Farmacia 24h", zona: "Norte", tipo: "10m3", cant: 5, coords: { x: 20, y: 30 } },
+        { id: "PED-104", cliente: "Clínica Incor", zona: "Norte", tipo: "10m3", cant: 20, coords: { x: 30, y: 60 } },
+        { id: "PED-105", cliente: "Hospital Obrero", zona: "Centro", tipo: "10m3", cant: 40, coords: { x: 60, y: 80 } },
+        { id: "PED-106", cliente: "Consultorio Norte", zona: "Norte", tipo: "Portatil", cant: 10, coords: { x: 30, y: 20 } },
+        { id: "PED-107", cliente: "Particular - Juan", zona: "Sur", tipo: "6m3", cant: 10, coords: { x: 80, y: 20 } },
+    ]);
 
-    // CÁLCULO DE PESO
-    const getPesoPedido = (p) => {
-        let unitWeight = 0;
-        if (p.tipo === "10m3") unitWeight = configPuntos.peso10m3;
-        if (p.tipo === "6m3") unitWeight = configPuntos.peso6m3;
-        if (p.tipo === "Portatil") unitWeight = configPuntos.pesoPortatil;
-        if (unitWeight === 0 && p.desc.includes("10m3")) unitWeight = configPuntos.peso10m3;
-        return p.cant * unitWeight;
+    // 2. Estados de Selección y UI
+    const [selectedVehicleId, setSelectedVehicleId] = useState(null);
+    const [selectedDriverId, setSelectedDriverId] = useState('');
+    const [selectedOrderIds, setSelectedOrderIds] = useState([]);
+    const [filterZone, setFilterZone] = useState('Todas');
+    const [weightConfig, setWeightConfig] = useState(INITIAL_WEIGHT_CONFIG);
+    const [showConfig, setShowConfig] = useState(false);
+    const [calculatedRoute, setCalculatedRoute] = useState(null);
+
+    // 3. Memos
+    const filteredOrders = useMemo(() =>
+            filterZone === 'Todas' ? pedidos : pedidos.filter(p => p.zona === filterZone)
+        , [filterZone, pedidos]);
+
+    const totalWeight = useMemo(() =>
+            selectedOrderIds.reduce((acc, id) => {
+                const order = pedidos.find(p => p.id === id);
+                return acc + calculateOrderWeight(order, weightConfig);
+            }, 0)
+        , [selectedOrderIds, pedidos, weightConfig]);
+
+    const currentVehicle = vehiculos.find(v => v.id === selectedVehicleId);
+    const isOverCapacity = currentVehicle && totalWeight > currentVehicle.cap;
+
+    // 4. Handlers de Acción
+    const handleToggleOrder = (id) => {
+        setSelectedOrderIds(prev => prev.includes(id) ? prev.filter(oid => oid !== id) : [...prev, id]);
+        setCalculatedRoute(null);
     };
 
-    const pedidosFiltrados = useMemo(() => {
-        if (filtroZona === 'Todas') return pedidosPendientes;
-        return pedidosPendientes.filter(p => p.zona === filtroZona);
-    }, [filtroZona, pedidosPendientes]);
-
-    const toggleOrder = (id) => {
-        if (selectedOrders.includes(id)) {
-            setSelectedOrders(selectedOrders.filter(o => o !== id));
-        } else {
-            setSelectedOrders([...selectedOrders, id]);
-        }
-        setRutaGenerada(false);
-        setRutaCalculada(null);
+    const handleGenerateRoute = () => {
+        const result = optimizeRoute(selectedOrderIds, pedidos);
+        setCalculatedRoute(result);
+        alert(`Ruta optimizada: ${result.distance} unidades de distancia.`);
     };
 
-    // LÓGICA DE CAPACIDAD
-    const cargaTotal = selectedOrders.reduce((acc, id) => {
-        const pedido = pedidosPendientes.find(p => p.id === id);
-        return acc + getPesoPedido(pedido);
-    }, 0);
-
-    const vehiculoActual = vehiculos.find(v => v.id === selectedVehicle);
-    const capacidadMaxima = vehiculoActual ? vehiculoActual.cap : 1;
-    const porcentajeCarga = Math.min((cargaTotal / capacidadMaxima) * 100, 100);
-    const capacidadExcedida = vehiculoActual && cargaTotal > vehiculoActual.cap;
-
-    let barraColor = "bg-green-500";
-    if (porcentajeCarga > 75) barraColor = "bg-yellow-500";
-    if (capacidadExcedida) barraColor = "bg-red-600";
-
-    const nombreChoferSel = conductores.find(c => c.id === selectedDriver)?.nombre || "Sin Asignar";
-
-    // --- ACCIONES ---
-    const handleReportarAveria = (e, id) => {
+    const handleVehicleMaintenance = (e, id) => {
         e.stopPropagation();
-        if(confirm("¿Reportar falla mecánica? El vehículo quedará inactivo.")) {
-            setVehiculos(vehiculos.map(v => v.id === id ? { ...v, estado: 'mantenimiento' } : v));
-            if (selectedVehicle === id) setSelectedVehicle(null);
+        if(confirm("¿Cambiar estado de mantenimiento del vehículo?")) {
+            setVehiculos(prev => prev.map(v =>
+                v.id === id ? {...v, estado: v.estado === 'disponible' ? 'mantenimiento' : 'disponible'} : v
+            ));
+            if(selectedVehicleId === id) setSelectedVehicleId(null);
         }
     };
 
-    const handleReportarBaja = (e, id) => {
+    // --- NUEVO: GESTIÓN DE ESTADO DEL CONDUCTOR ---
+    const handleToggleDriverStatus = (e, id) => {
         e.stopPropagation();
-        if(confirm("¿Marcar conductor como NO DISPONIBLE (Baja Médica/Falta)?")) {
-            setConductores(conductores.map(c => c.id === id ? { ...c, estado: 'Baja Médica' } : c));
-            if (selectedDriver === id) {
-                setSelectedDriver('');
-                setRutaGenerada(false);
-                alert("Conductor desvinculado.");
+
+        // Lógica de cambio de estado
+        setConductores(prev => prev.map(c => {
+            if (c.id === id) {
+                const isAvailable = c.estado === 'Libre';
+                return { ...c, estado: isAvailable ? 'Baja Médica' : 'Libre' };
             }
+            return c;
+        }));
+
+        // Si el conductor seleccionado pasa a NO disponible, lo deseleccionamos
+        if (selectedDriverId === id) {
+            setSelectedDriverId('');
         }
-    };
-
-    const handleGenerarRuta = () => {
-        if (selectedOrders.length === 0) return alert("Seleccione pedidos");
-
-        // Algoritmo "Nearest Neighbor"
-        let nodosPendientes = pedidosPendientes.filter(p => selectedOrders.includes(p.id));
-        let nodoActual = { x: 50, y: 50 }; // HUB CENTRAL
-        let rutaOrdenada = [];
-        let distanciaTotal = 0;
-
-        while (nodosPendientes.length > 0) {
-            nodosPendientes.sort((a, b) => {
-                const distA = Math.sqrt(Math.pow(a.coords.x - nodoActual.x, 2) + Math.pow(a.coords.y - nodoActual.y, 2));
-                const distB = Math.sqrt(Math.pow(b.coords.x - nodoActual.x, 2) + Math.pow(b.coords.y - nodoActual.y, 2));
-                return distA - distB;
-            });
-
-            const siguiente = nodosPendientes.shift();
-            const dist = Math.sqrt(Math.pow(siguiente.coords.x - nodoActual.x, 2) + Math.pow(siguiente.coords.y - nodoActual.y, 2));
-
-            distanciaTotal += dist;
-            rutaOrdenada.push({ ...siguiente });
-            nodoActual = siguiente.coords;
-        }
-
-        // Retorno a base
-        const distRetorno = Math.sqrt(Math.pow(50 - nodoActual.x, 2) + Math.pow(50 - nodoActual.y, 2));
-        distanciaTotal += distRetorno;
-
-        setRutaCalculada({
-            pasos: rutaOrdenada,
-            distanciaTotal: Math.round(distanciaTotal)
-        });
-        setRutaGenerada(true);
-        alert(`Ruta Optimizada Generada (Distancia: ${Math.round(distanciaTotal)} u).\nItinerario creado.`);
-    };
-
-    const handleCapChange = (id, newVal) => {
-        setVehiculos(vehiculos.map(v => v.id === id ? { ...v, cap: parseInt(newVal) || 0 } : v));
     };
 
     return (
-        <div className="space-y-6 relative">
-            {showConfig && <ConfigPanel config={configPuntos} setConfig={setConfigPuntos} onClose={() => setShowConfig(false)} />}
+        <div className="space-y-6">
+            {showConfig && (
+                <ConfigModal
+                    config={weightConfig}
+                    onSave={(k, v) => setWeightConfig({...weightConfig, [k]: Number(v)})}
+                    onClose={() => setShowConfig(false)}
+                />
+            )}
 
             <div className="flex justify-between items-center">
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-800">Planificador de Distribución</h2>
-                    <p className="text-gray-500">Asignación de carga basada en volumen ($m^3$) y algoritmos de ruta.</p>
-                </div>
+                <header>
+                    <h2 className="text-2xl font-bold text-gray-800">Planificador Logístico</h2>
+                    <p className="text-gray-500 text-sm italic">Optimización de carga y rutas mediante Nearest Neighbor.</p>
+                </header>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setShowConfig(true)}>
-                        <Settings size={18} /> Config. Ponderación
-                    </Button>
-                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg border shadow-sm">
-                        <Calendar size={18} className="text-gray-500"/>
-                        <span className="font-semibold text-gray-700">04 Dic, 2025</span>
+                    <Button variant="outline" onClick={() => setShowConfig(true)}><Settings size={18} /> Configurar Pesos</Button>
+                    <div className="bg-white border px-4 py-2 rounded-lg shadow-sm flex items-center gap-2">
+                        <Calendar size={18} className="text-blue-500"/>
+                        <span className="font-mono text-sm">2026-01-13</span>
                     </div>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                {/* COLUMNA IZQUIERDA (CONTROLES) */}
-                <div className="lg:col-span-5 space-y-6">
+                {/* --- PANEL IZQUIERDO --- */}
+                <aside className="lg:col-span-5 space-y-6">
+
                     {/* 1. VEHÍCULOS */}
-                    <section>
-                        <h3 className="font-bold text-gray-700 mb-2 text-sm uppercase">1. Vehículo Disponible</h3>
-                        <div className="space-y-2">
-                            {vehiculos.map(v => {
-                                const isAvailable = v.estado === 'disponible';
+                    <section className="space-y-3">
+                        <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">1. Selección de Transporte</h3>
+                        {vehiculos.map(v => (
+                            <div
+                                key={v.id}
+                                onClick={() => v.estado === 'disponible' && setSelectedVehicleId(v.id)}
+                                className={`p-3 rounded-xl border transition-all cursor-pointer flex justify-between items-center group
+                                    ${selectedVehicleId === v.id ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'bg-white border-gray-100 hover:border-blue-200'}
+                                    ${v.estado !== 'disponible' ? 'opacity-60 bg-gray-50 cursor-not-allowed' : ''}
+                                `}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`p-2 rounded-lg ${v.estado === 'disponible' ? 'bg-slate-100 text-slate-600' : 'bg-red-50 text-red-400'}`}>
+                                        <Truck size={20}/>
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-sm text-gray-700">{v.modelo}</p>
+                                        <p className="text-[10px] font-mono text-gray-400">{v.placa} | Cap: {v.cap}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Badge variant={v.estado === 'disponible' ? 'success' : 'danger'}>{v.estado}</Badge>
+                                    <button onClick={(e) => handleVehicleMaintenance(e, v.id)} className="text-gray-300 hover:text-orange-500 transition-colors" title="Cambiar Estado">
+                                        <Wrench size={16}/>
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </section>
+
+                    {/* 2. CONDUCTORES (ACTUALIZADO CON BAJA MÉDICA) */}
+                    <section className="space-y-3">
+                        <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">2. Asignación de Personal</h3>
+                        <div className="grid grid-cols-1 gap-2 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                            {conductores.map(c => {
+                                const isAvailable = c.estado === 'Libre';
                                 return (
-                                    <div key={v.id}
-                                         onClick={() => isAvailable && setSelectedVehicle(v.id)}
-                                         className={`relative p-3 rounded-lg border cursor-pointer transition-all flex justify-between items-center group
-                                            ${selectedVehicle === v.id ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'bg-white border-gray-200 hover:border-blue-300'}
-                                            ${!isAvailable ? 'opacity-60 bg-gray-50 pointer-events-none' : ''}
-                                         `}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className={`p-2 rounded-full ${isAvailable ? 'bg-blue-100 text-blue-600' : 'bg-gray-200 text-gray-500'}`}>
-                                                <Truck size={20}/>
+                                    <div key={c.id} className="flex items-center gap-2">
+                                        <button
+                                            disabled={!isAvailable}
+                                            onClick={() => setSelectedDriverId(c.id)}
+                                            className={`flex-1 flex items-center justify-between p-2 rounded-lg border text-xs transition-all text-left
+                                                ${selectedDriverId === c.id ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-gray-100 text-gray-600 hover:bg-gray-50'}
+                                                ${!isAvailable ? 'opacity-50 bg-gray-50 cursor-not-allowed border-dashed' : ''}
+                                            `}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <User size={16}/>
+                                                <span className={!isAvailable ? 'line-through decoration-red-500' : ''}>{c.nombre}</span>
                                             </div>
-                                            <div>
-                                                <p className="font-bold text-gray-800">{v.modelo}</p>
-                                                <p className="text-xs text-gray-500">Placa: {v.placa}</p>
-                                            </div>
-                                        </div>
-                                        <div className="text-right" onClick={(e) => e.stopPropagation()}>
-                                            <Badge variant={isAvailable ? "success" : "danger"}>{isAvailable ? "Disponible" : "Taller"}</Badge>
-                                            <div className="mt-1 flex justify-end">
-                                                {isEditingCap === v.id ? (
-                                                    <input
-                                                        type="number"
-                                                        className="w-16 text-right text-xs border border-blue-400 rounded px-1"
-                                                        autoFocus
-                                                        value={v.cap}
-                                                        onChange={(e) => handleCapChange(v.id, e.target.value)}
-                                                        onBlur={() => setIsEditingCap(null)}
-                                                    />
-                                                ) : (
-                                                    <span
-                                                        className="text-xs font-bold text-gray-600 hover:text-blue-600 border-b border-dotted border-gray-400 cursor-text"
-                                                        onClick={() => setIsEditingCap(v.id)}
-                                                        title="Clic para editar capacidad"
-                                                    >
-                                                        Cap: {v.cap} pts
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        {isAvailable && (
-                                            <button onClick={(e) => handleReportarAveria(e, v.id)} className="absolute -top-2 -right-2 bg-white text-gray-400 hover:text-red-500 border shadow-sm rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10" title="Reportar Avería">
-                                                <Wrench size={12}/>
-                                            </button>
-                                        )}
+                                            <span className={`font-bold text-[10px] uppercase px-1.5 py-0.5 rounded ${isAvailable ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                {c.estado}
+                                            </span>
+                                        </button>
+
+                                        {/* Botón de cambio de estado (Baja / Alta) */}
+                                        <button
+                                            onClick={(e) => handleToggleDriverStatus(e, c.id)}
+                                            className={`p-2 rounded-lg border transition-colors ${isAvailable ? 'text-gray-400 border-transparent hover:text-red-500 hover:bg-red-50' : 'text-green-600 bg-green-50 border-green-200 hover:bg-green-100'}`}
+                                            title={isAvailable ? "Marcar Baja Médica / Ausencia" : "Dar de Alta / Disponible"}
+                                        >
+                                            {isAvailable ? <UserX size={16}/> : <UserCheck size={16}/>}
+                                        </button>
                                     </div>
                                 );
                             })}
                         </div>
                     </section>
 
-                    {/* 2. CONDUCTORES */}
-                    <section>
-                        <h3 className="font-bold text-gray-700 mb-2 text-sm uppercase">2. Conductor</h3>
-                        <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-                            <div className="grid grid-cols-1 gap-2">
-                                {conductores.map(c => {
-                                    const isLibre = c.estado === 'Libre';
-                                    const isSelected = selectedDriver === c.id;
-                                    return (
-                                        <div key={c.id} className="relative group">
-                                            <button
-                                                disabled={!isLibre}
-                                                onClick={() => setSelectedDriver(c.id)}
-                                                className={`w-full flex items-center justify-between p-2 rounded-lg text-sm border transition-all 
-                                                    ${isSelected ? 'bg-blue-50 border-blue-500 text-blue-700 font-bold ring-1 ring-blue-500' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'} 
-                                                    ${!isLibre ? 'opacity-50 cursor-not-allowed bg-gray-100' : ''}`}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <User size={16}/>
-                                                    <span>{c.nombre}</span>
-                                                </div>
-                                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${isLibre ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                    {c.estado}
-                                                </span>
-                                            </button>
-                                            {isLibre && (
-                                                <button onClick={(e) => handleReportarBaja(e, c.id)} className="absolute top-1/2 -translate-y-1/2 right-[-10px] translate-x-full lg:translate-x-0 lg:right-2 p-1.5 bg-white border border-gray-200 shadow-sm rounded-full text-gray-400 hover:text-red-600 hover:border-red-300 opacity-0 group-hover:opacity-100 transition-opacity z-10" title="Marcar Baja">
-                                                    <UserX size={14}/>
-                                                </button>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </section>
-
                     {/* 3. CARGA */}
-                    <section className="flex-1 flex flex-col">
-                        <div className="flex justify-between items-center mb-2">
-                            <h3 className="font-bold text-gray-700 text-sm uppercase">3. Carga ({selectedOrders.length})</h3>
-                            <div className="flex items-center gap-2">
-                                <Filter size={14} className="text-gray-500"/>
-                                <select className="text-xs border rounded p-1 bg-white" value={filtroZona} onChange={(e) => setFiltroZona(e.target.value)}>
-                                    <option value="Todas">Todas Zonas</option>
-                                    <option value="Norte">Norte</option>
-                                    <option value="Centro">Centro</option>
-                                    <option value="Sur">Sur</option>
-                                </select>
-                            </div>
+                    <section className="space-y-3">
+                        <div className="flex justify-between items-end">
+                            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">3. Consolidación de Pedidos</h3>
+                            <select className="text-[10px] border rounded bg-white px-2 py-1" value={filterZone} onChange={e => setFilterZone(e.target.value)}>
+                                <option>Todas</option><option>Norte</option><option>Centro</option><option>Sur</option>
+                            </select>
                         </div>
-
-                        <Card className="flex-1 flex flex-col overflow-hidden border-blue-200 shadow-sm">
-                            <div className="max-h-60 overflow-y-auto">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-gray-50 text-gray-500 sticky top-0">
-                                    <tr><th className="p-2 w-8"><CheckSquare size={14}/></th><th className="p-2 text-left">Pedido / Ubicación</th><th className="p-2 text-right">Peso</th></tr>
+                        <Card className="border-gray-100 shadow-sm overflow-hidden">
+                            <div className="max-h-48 overflow-y-auto border-b">
+                                <table className="w-full text-[11px] text-left">
+                                    <thead className="bg-gray-50 sticky top-0 text-gray-400 font-bold uppercase">
+                                    <tr><th className="p-2 w-10"></th><th className="p-2">Cliente</th><th className="p-2 text-right">Peso</th></tr>
                                     </thead>
                                     <tbody className="divide-y">
-                                    {pedidosFiltrados.map(p => {
-                                        const pesoCalc = getPesoPedido(p);
-                                        return (
-                                            <tr key={p.id}
-                                                onClick={() => toggleOrder(p.id)}
-                                                className={`hover:bg-blue-50 cursor-pointer transition-colors ${selectedOrders.includes(p.id) ? 'bg-blue-50' : ''}`}
-                                            >
-                                                <td className="p-2"><input type="checkbox" checked={selectedOrders.includes(p.id)} readOnly className="accent-blue-600"/></td>
-                                                <td className="p-2">
-                                                    <div className="font-bold text-xs">{p.cliente}</div>
-                                                    <div className="text-[10px] text-gray-500 flex items-center gap-1">
-                                                        <Navigation size={10}/> [{p.coords.x}, {p.coords.y}] {p.zona}
-                                                    </div>
-                                                </td>
-                                                <td className="p-2 text-right font-mono text-xs font-bold">{pesoCalc}</td>
-                                            </tr>
-                                        );
-                                    })}
+                                    {filteredOrders.map(p => (
+                                        <tr key={p.id} onClick={() => handleToggleOrder(p.id)} className={`cursor-pointer hover:bg-slate-50 ${selectedOrderIds.includes(p.id) ? 'bg-blue-50/50' : ''}`}>
+                                            <td className="p-2 text-center"><input type="checkbox" checked={selectedOrderIds.includes(p.id)} readOnly className="accent-blue-500"/></td>
+                                            <td className="p-2"><p className="font-bold">{p.cliente}</p><p className="text-[9px] text-gray-400">{p.zona}</p></td>
+                                            <td className="p-2 text-right font-mono font-bold text-blue-600">{calculateOrderWeight(p, weightConfig)}</td>
+                                        </tr>
+                                    ))}
                                     </tbody>
                                 </table>
                             </div>
-
-                            <div className="p-4 bg-slate-50 border-t border-slate-200">
-                                <div className="flex justify-between items-center mb-1 text-xs font-bold">
-                                    <span className="text-gray-500">OCUPACIÓN</span>
-                                    <span className={capacidadExcedida ? "text-red-600" : "text-gray-700"}>
-                                        {cargaTotal} / {vehiculoActual ? vehiculoActual.cap : '---'} pts
+                            <div className="p-3 bg-slate-50">
+                                <div className="flex justify-between text-[10px] font-bold mb-1">
+                                    <span className="text-gray-400 uppercase">Progreso de Carga</span>
+                                    <span className={isOverCapacity ? "text-red-500" : "text-blue-700"}>
+                                        {totalWeight} / {currentVehicle?.cap || 0} pts
                                     </span>
                                 </div>
-                                <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden shadow-inner">
+                                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden shadow-inner">
                                     <div
-                                        className={`h-full transition-all duration-500 ${barraColor}`}
-                                        style={{ width: vehiculoActual ? `${porcentajeCarga}%` : '0%' }}
+                                        className={`h-full transition-all duration-700 ${isOverCapacity ? 'bg-red-500' : 'bg-blue-500'}`}
+                                        style={{ width: `${Math.min((totalWeight / (currentVehicle?.cap || 1)) * 100, 100)}%` }}
                                     ></div>
                                 </div>
-                                {capacidadExcedida && <p className="text-[10px] text-red-500 mt-1 font-bold text-center">¡CAPACIDAD EXCEDIDA!</p>}
                             </div>
                         </Card>
                     </section>
 
                     <Button
+                        className="w-full h-12 shadow-xl shadow-blue-100 group"
                         variant="primary"
-                        className="w-full h-12 shadow-md"
-                        onClick={handleGenerarRuta}
-                        disabled={!selectedVehicle || !selectedDriver || selectedOrders.length === 0 || capacidadExcedida}
+                        onClick={handleGenerateRoute}
+                        disabled={!selectedVehicleId || !selectedDriverId || selectedOrderIds.length === 0 || isOverCapacity}
                     >
-                        <Zap size={20} className={rutaGenerada ? "text-yellow-300" : ""} />
-                        {rutaGenerada ? "Ruta Calculada" : "Calcular Ruta Óptima"}
+                        <Zap size={20} className="group-hover:animate-bounce"/> Calcular Despacho Óptimo
                     </Button>
-                </div>
+                </aside>
 
-                {/* --- COLUMNA DERECHA: MAPA REALISTA (MEJORADO) --- */}
-                <div className="lg:col-span-7">
-                    <Card className="h-full min-h-[600px] flex flex-col bg-white">
-                        <CardHeader className="border-b py-3 bg-gray-50">
-                            <CardTitle className="text-sm flex justify-between items-center">
-                                <span>Mapa de Ruta (Geoespacial)</span>
-                                {rutaGenerada && <Badge variant="success">Algoritmo Finalizado</Badge>}
+                {/* --- PANEL DERECHO (MAPA) --- */}
+                <main className="lg:col-span-7 space-y-4">
+                    <Card className="h-full border-gray-100 flex flex-col min-h-[650px] overflow-hidden">
+                        <CardHeader className="bg-gray-50 border-b py-3">
+                            <CardTitle className="text-xs text-gray-400 flex items-center justify-between uppercase tracking-tighter">
+                                Monitor de Ruta en Tiempo Real
+                                {calculatedRoute && <span className="text-green-600 flex items-center gap-1"><div className="w-2 h-2 bg-green-500 rounded-full animate-ping"/> Online</span>}
                             </CardTitle>
                         </CardHeader>
 
-                        <div className="flex-1 bg-slate-900 relative overflow-hidden flex flex-col items-center justify-center p-4">
-                            <div className="relative w-full max-w-md aspect-square bg-slate-800 rounded-xl border-4 border-slate-700 shadow-2xl">
-                                {/* GRID DE FONDO (Estilo Plano Cartesiano) */}
-                                <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'linear-gradient(#334155 1px, transparent 1px), linear-gradient(90deg, #334155 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+                        <div className="flex-1 bg-slate-900 relative p-6 flex items-center justify-center">
+                            <div className="relative w-full aspect-square max-w-lg bg-slate-800 rounded-2xl border-[10px] border-slate-700 shadow-inner overflow-hidden">
+                                {/* Grid */}
+                                <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '25px 25px' }}></div>
 
-                                {/* CENTRAL (50, 50) */}
-                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 flex flex-col items-center">
-                                    <div className="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-lg shadow-blue-500/50 animate-pulse"></div>
-                                    <span className="text-[10px] font-bold text-white mt-1 bg-black/50 px-1 rounded">OXIPUR</span>
+                                {/* HUB */}
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30">
+                                    <div className="w-6 h-6 bg-blue-500 rounded-lg border-2 border-white flex items-center justify-center shadow-lg shadow-blue-500/40">
+                                        <Flag size={12} className="text-white"/>
+                                    </div>
                                 </div>
 
-                                {/* PUNTOS DE CLIENTES */}
-                                {pedidosPendientes.map(p => {
-                                    const isSelected = selectedOrders.includes(p.id);
-                                    // Si hay ruta, ver si este punto es parte de ella y qué orden tiene
-                                    const indexInRoute = rutaCalculada?.pasos.findIndex(paso => paso.id === p.id);
+                                {/* RUTAS SVG */}
+                                <svg className="absolute inset-0 w-full h-full z-10" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                    {calculatedRoute && (
+                                        <polyline
+                                            points={`50,50 ${calculatedRoute.steps.map(s => `${s.coords.x},${s.coords.y}`).join(' ')} 50,50`}
+                                            fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeDasharray="4 2" className="animate-[dash_20s_linear_infinite]"
+                                        />
+                                    )}
+                                </svg>
+
+                                {/* PINS */}
+                                {pedidos.map(p => {
+                                    const isSelected = selectedOrderIds.includes(p.id);
+                                    const stepIdx = calculatedRoute?.steps.findIndex(s => s.id === p.id);
+                                    if (!isSelected && !calculatedRoute) return null;
 
                                     return (
-                                        <div key={p.id}
-                                             className={`absolute -translate-x-1/2 -translate-y-1/2 transition-all duration-500 z-20
-                                                ${isSelected ? 'opacity-100' : 'opacity-30'}
-                                            `}
-                                             style={{ left: `${p.coords.x}%`, top: `${p.coords.y}%` }}
+                                        <div
+                                            key={p.id}
+                                            className={`absolute -translate-x-1/2 -translate-y-1/2 transition-all duration-500 z-20 ${isSelected ? 'scale-110' : 'opacity-20 scale-75'}`}
+                                            style={{ left: `${p.coords.x}%`, top: `${p.coords.y}%` }}
                                         >
-                                            {/* PIN MARKER */}
-                                            {isSelected ? (
-                                                <div className="flex flex-col items-center">
-                                                    <div className={`w-8 h-8 flex items-center justify-center -mb-1
-                                                        ${indexInRoute !== undefined && indexInRoute >= 0 ? 'text-white' : 'text-yellow-400'}
-                                                    `}>
-                                                        <Map size={32} fill={indexInRoute !== undefined && indexInRoute >= 0 ? '#10b981' : '#facc15'} />
-                                                        {indexInRoute !== undefined && indexInRoute >= 0 && (
-                                                            <span className="absolute text-[10px] font-bold mt-[-4px] text-black">{indexInRoute + 1}</span>
-                                                        )}
-                                                    </div>
-                                                    <span className="text-[8px] text-white bg-black/70 px-1 rounded whitespace-nowrap">{p.cliente}</span>
+                                            <div className="flex flex-col items-center">
+                                                <div className={`p-1.5 rounded-full border-2 shadow-xl ${stepIdx >= 0 ? 'bg-green-500 border-white' : 'bg-slate-600 border-slate-400'}`}>
+                                                    <Navigation size={12} className="text-white fill-white"/>
                                                 </div>
-                                            ) : (
-                                                <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-                                            )}
+                                                {stepIdx >= 0 && <span className="mt-1 bg-green-600 text-[8px] font-bold text-white px-1.5 rounded-full">#{stepIdx + 1}</span>}
+                                            </div>
                                         </div>
                                     );
                                 })}
-
-                                {/* LÍNEA DE RUTA ESTILO GOOGLE MAPS */}
-                                {rutaCalculada && (
-                                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                        {/* Sombra de la ruta (Glow) */}
-                                        <polyline
-                                            points={`50,50 ${rutaCalculada.pasos.map(step => `${step.coords.x},${step.coords.y}`).join(' ')} 50,50`}
-                                            fill="none"
-                                            stroke="#3b82f6"
-                                            strokeWidth="3"
-                                            strokeOpacity="0.3"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        />
-                                        {/* Línea Principal Azul Sólida */}
-                                        <polyline
-                                            points={`50,50 ${rutaCalculada.pasos.map(step => `${step.coords.x},${step.coords.y}`).join(' ')} 50,50`}
-                                            fill="none"
-                                            stroke="#3b82f6"
-                                            strokeWidth="1"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            className="drop-shadow-md"
-                                        />
-                                    </svg>
-                                )}
                             </div>
                         </div>
 
-                        <div className="h-1/3 bg-white border-t p-0 overflow-y-auto">
-                            {rutaCalculada ? (
+                        <div className="h-48 border-t overflow-y-auto bg-white p-2">
+                            {calculatedRoute ? (
                                 <RouteTimeline paradas={[
-                                    { id: 0, direccion: "Central OXIPUR", cliente: "Inicio de Ruta", estado: "completado", hora: "08:00 AM" },
-                                    ...rutaCalculada.pasos.map((paso, i) => ({
-                                        id: i + 1,
-                                        direccion: `Coord: [${paso.coords.x}, ${paso.coords.y}] - ${paso.zona}`,
-                                        cliente: paso.cliente,
-                                        estado: "pendiente",
-                                        hora: `+${Math.round(i * 30 + 30)} min`
-                                    })),
-                                    { id: 99, direccion: "Central OXIPUR", cliente: "Retorno a Base", estado: "pendiente", hora: "Fin" }
+                                    { id: 'S', cliente: 'Base Central', direccion: 'Hub Oxipur', hora: 'Inicio', estado: 'completado' },
+                                    ...calculatedRoute.steps.map((s, i) => ({
+                                        id: s.id, cliente: s.cliente, direccion: s.zona, hora: `Punto ${i+1}`, estado: 'pendiente'
+                                    }))
                                 ]} />
                             ) : (
-                                <div className="flex items-center justify-center h-full text-gray-400 text-sm italic">
-                                    Seleccione pedidos y calcule la ruta para ver el itinerario.
+                                <div className="h-full flex items-center justify-center text-gray-300 text-xs italic">
+                                    Esperando definición de ruta...
                                 </div>
                             )}
                         </div>
                     </Card>
-                </div>
+                </main>
             </div>
         </div>
     );

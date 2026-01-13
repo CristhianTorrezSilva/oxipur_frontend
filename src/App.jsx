@@ -1,78 +1,95 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-// 1. Layouts
+// Layouts
 import MainLayout from './components/layout/MainLayout';
 import AuthLayout from './components/layout/AuthLayout';
 
-// 2. Páginas Auth & Chofer
+// Autenticación
 import Login from './pages/auth/Login';
-import EntregaMovil from './pages/Chofer/EntregaMovil';
 
-// 3. Páginas del Sistema (Admin/Ventas/Logística)
+// Vistas Operativas
+import EntregaMovil from './pages/Chofer/EntregaMovil';
 import Dashboard from './pages/Reportes/Dashboard';
 import NuevoPedido from './pages/Ventas/NuevoPedido';
 import ListaPedidos from './pages/Ventas/ListaPedidos';
 import Planificador from './pages/Logistica/Planificador';
 import GuiaDespacho from './pages/Logistica/GuiaDespacho';
-import Inventario from './pages/Almacen/Inventario';
-import NuevoReclamo from './pages/Reclamos/NuevoReclamo';
-import ListaReclamos from './pages/Reclamos/ListaReclamos';
-import CentroReportes from './pages/Reportes/CentroReportes.jsx';
 import Zonas from './pages/Logistica/Zonas';
-
-// 4. NUEVAS PÁGINAS (Clientes y Usuarios)
+import Inventario from './pages/Almacen/Inventario';
+import ListaReclamos from './pages/Reclamos/ListaReclamos';
+import NuevoReclamo from './pages/Reclamos/NuevoReclamo';
+import CentroReportes from './pages/Reportes/CentroReportes.jsx';
 import ListaClientes from './pages/Clientes/ListaClientes';
 import Usuarios from './pages/Admin/Usuarios';
 
-function App() {
+/**
+ * PENTESTER INSIGHT:
+ * Un sistema real requiere un Wrapper de Protección.
+ * Aquí simulamos la lógica que verificaría el JWT en el LocalStorage.
+ */
+const ProtectedRoute = ({ children }) => {
+    const isAuthenticated = localStorage.getItem('oxipur_token'); // Simulación de sesión
+    return isAuthenticated ? children : <Navigate to="/login" replace />;
+};
+
+const App = () => {
     return (
         <BrowserRouter>
             <Routes>
-
-                {/* Rutas Públicas / Pantalla Completa */}
+                {/* --- SECCIÓN PÚBLICA / AUTH --- */}
                 <Route element={<AuthLayout />}>
                     <Route path="/login" element={<Login />} />
-                    <Route path="/chofer/entrega" element={<EntregaMovil />} />
                 </Route>
 
-                {/* Rutas Privadas con Menú Lateral */}
-                <Route element={<MainLayout />}>
+                {/* --- SECCIÓN OPERATIVA MÓVIL (CHOFER) ---
+                    Se separa del MainLayout porque usa una UI simplificada
+                */}
+                <Route path="/chofer/entrega" element={<EntregaMovil />} />
 
+                {/* --- SECCIÓN ADMINISTRATIVA (PROTEGIDA) --- */}
+                <Route element={
+                    <ProtectedRoute>
+                        <MainLayout />
+                    </ProtectedRoute>
+                }>
+                    {/* Dashboard Principal */}
                     <Route path="/dashboard" element={<Dashboard />} />
 
-                    {/* Ventas y Clientes */}
-                    <Route path="/ventas/nuevo" element={<NuevoPedido />} />
-                    <Route path="/ventas/lista" element={<ListaPedidos />} />
-
-                    {/* AQUÍ ESTABA EL ERROR, AHORA APUNTA AL COMPONENTE REAL: */}
+                    {/* Módulo de Ventas y CRM */}
+                    <Route path="/ventas">
+                        <Route path="nuevo" element={<NuevoPedido />} />
+                        <Route path="lista" element={<ListaPedidos />} />
+                    </Route>
                     <Route path="/clientes" element={<ListaClientes />} />
 
-                    {/* Logística */}
-                    <Route path="/logistica/planificacion" element={<Planificador />} />
-                    <Route path="/logistica/despacho" element={<GuiaDespacho />} />
-                    <Route path="/logistica/zonas" element={<Zonas />} />
+                    {/* Módulo Logístico y Distribución */}
+                    <Route path="/logistica">
+                        <Route path="planificacion" element={<Planificador />} />
+                        <Route path="despacho" element={<GuiaDespacho />} />
+                        <Route path="zonas" element={<Zonas />} />
+                    </Route>
 
-                    {/* Almacén */}
+                    {/* Módulo de Almacén e Inventario */}
                     <Route path="/almacen/inventario" element={<Inventario />} />
 
-                    {/* Soporte */}
-                    <Route path="/reclamos" element={<ListaReclamos />} />
-                    <Route path="/reclamos/nuevo" element={<NuevoReclamo />} />
+                    {/* Gestión de Post-Venta y Reclamos */}
+                    <Route path="/reclamos">
+                        <Route index element={<ListaReclamos />} />
+                        <Route path="nuevo" element={<NuevoReclamo />} />
+                    </Route>
 
-                    {/* Reportes y Admin */}
+                    {/* Business Intelligence y Administración */}
                     <Route path="/reportes" element={<CentroReportes />} />
                     <Route path="/admin/usuarios" element={<Usuarios />} />
-
                 </Route>
 
-                {/* Redirecciones */}
+                {/* --- FALLBACKS --- */}
                 <Route path="/" element={<Navigate to="/login" replace />} />
                 <Route path="*" element={<Navigate to="/login" replace />} />
-
             </Routes>
         </BrowserRouter>
     );
-}
+};
 
 export default App;

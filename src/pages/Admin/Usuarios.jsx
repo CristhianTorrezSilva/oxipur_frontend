@@ -1,235 +1,160 @@
 import React, { useState } from 'react';
-import { Shield, User, Lock, Edit, CheckCircle, Eye, Save, Plus, Key, UserX, UserCheck, Mail, List } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
+import {
+    Search, UserPlus, Shield, CheckCircle,
+    XCircle, MoreVertical, Edit, UserX
+} from 'lucide-react';
 import Button from '../../components/ui/Button';
-import Badge from '../../components/ui/Badge';
-import Modal from '../../components/ui/Modal';
-import Input from '../../components/ui/Input';
-import Alert from '../../components/ui/Alert';
+import { Card } from '../../components/ui/Card';
+
+// --- DATOS MOCK (Simulación DB) ---
+const INITIAL_USERS = [
+    { id: 1, nombre: 'Admin General', email: 'admin@oxipur.com', rol: 'admin', estado: 'activo', ultimoAcceso: '2023-10-25 10:42' },
+    { id: 2, nombre: 'Juan Chofer', email: 'juan.perez@oxipur.com', rol: 'chofer', estado: 'activo', ultimoAcceso: '2023-10-25 08:15' },
+    { id: 3, nombre: 'Carla Ventas', email: 'carla@oxipur.com', rol: 'ventas', estado: 'inactivo', ultimoAcceso: '2023-09-10 14:00' },
+    { id: 4, nombre: 'Mario Logística', email: 'mario@oxipur.com', rol: 'logistica', estado: 'activo', ultimoAcceso: '2023-10-24 18:30' },
+];
 
 const Usuarios = () => {
-    const [activeTab, setActiveTab] = useState('usuarios'); // 'usuarios' | 'roles'
+    const [usuarios, setUsuarios] = useState(INITIAL_USERS);
+    const [busqueda, setBusqueda] = useState('');
 
-    // ESTADOS MODALES
-    const [userModalOpen, setUserModalOpen] = useState(false);
-    const [roleModalOpen, setRoleModalOpen] = useState(false); // NUEVO: Modal para roles
-    const [auditModalOpen, setAuditModalOpen] = useState(false);
+    // --- LÓGICA DE NEGOCIO SEGURA ---
 
-    const [selectedUser, setSelectedUser] = useState(null);
-    const [selectedRole, setSelectedRole] = useState(null);
-
-    // MOCK: Usuarios
-    const [usuarios, setUsuarios] = useState([
-        { id: 1, nombre: 'Admin General', email: 'admin@oxipur.bo', rol: 'Administrador', estado: 'Activo' },
-        { id: 2, nombre: 'Carla Vendedora', email: 'ventas@oxipur.bo', rol: 'Enc. Ventas', estado: 'Activo' },
-        { id: 3, nombre: 'Juan Chofer', email: 'juan@oxipur.bo', rol: 'Conductor', estado: 'Inactivo' },
-    ]);
-
-    // MOCK: Roles con Versiones (CASO DE USO 39)
-    const [rolesDefinidos, setRolesDefinidos] = useState([
-        { id: 'admin', nombre: 'Administrador', usuarios: 1, version: 'v1.2' },
-        { id: 'ventas', nombre: 'Enc. Ventas', usuarios: 1, version: 'v1.0' },
-        { id: 'logistica', nombre: 'Enc. Logística', usuarios: 0, version: 'v1.1' },
-        { id: 'chofer', nombre: 'Conductor', usuarios: 10, version: 'v2.0' },
-    ]);
-
-    // --- LÓGICA DE USUARIOS ---
-    const handleSaveUser = (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData);
-
-        if (selectedUser) {
-            setUsuarios(usuarios.map(u => u.id === selectedUser.id ? { ...u, ...data } : u));
-            alert("Usuario actualizado. Relación rol-usuario refrescada.");
-        } else {
-            const newUser = { id: Date.now(), ...data, estado: 'Activo' };
-            setUsuarios([...usuarios, newUser]);
-            alert("Usuario creado. Credenciales enviadas.");
-        }
-        setUserModalOpen(false);
+    // Función para "Dar de Baja" o Reactivar (Soft Delete)
+    const toggleEstadoUsuario = (id) => {
+        setUsuarios(prev => prev.map(user => {
+            if (user.id === id) {
+                const nuevoEstado = user.estado === 'activo' ? 'inactivo' : 'activo';
+                // En un sistema real, aquí harías una petición PUT al backend
+                return { ...user, estado: nuevoEstado };
+            }
+            return user;
+        }));
     };
 
-    const handleToggleStatus = (id, currentStatus) => {
-        const nuevoEstado = currentStatus === 'Activo' ? 'Inactivo' : 'Activo';
-        if(confirm(`¿Confirmar cambio de estado a ${nuevoEstado}?`)) {
-            setUsuarios(usuarios.map(u => u.id === id ? { ...u, estado: nuevoEstado } : u));
-        }
+    // Filtrado en tiempo real
+    const usuariosFiltrados = usuarios.filter(user =>
+        user.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+        user.rol.toLowerCase().includes(busqueda.toLowerCase())
+    );
+
+    // --- COMPONENTES VISUALES ---
+
+    const RoleBadge = ({ rol }) => {
+        const colors = {
+            admin: 'bg-purple-100 text-purple-700 border-purple-200',
+            chofer: 'bg-blue-100 text-blue-700 border-blue-200',
+            ventas: 'bg-orange-100 text-orange-700 border-orange-200',
+            logistica: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+        };
+        return (
+            <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase border ${colors[rol] || 'bg-gray-100 text-gray-600'}`}>
+                {rol}
+            </span>
+        );
     };
 
-    const handleResetPassword = (email) => {
-        if(confirm(`¿Forzar reseteo de contraseña?`)) alert(`Token de reseteo enviado a ${email}`);
-    };
-
-    // --- LÓGICA DE ROLES (CASO DE USO: GESTIONAR ROLES) ---
-    const handleOpenRoleModal = (role = null) => {
-        setSelectedRole(role);
-        setRoleModalOpen(true);
-    };
-
-    const handleSaveRole = (e) => {
-        e.preventDefault();
-        // SISTEMA: Valida permisos y versiona el rol
-        if (selectedRole) {
-            alert(`Rol "${selectedRole.nombre}" actualizado a nueva versión (v${(parseFloat(selectedRole.version.substring(1)) + 0.1).toFixed(1)}). Caché de permisos invalidada.`);
-        } else {
-            alert("Nuevo rol creado y políticas aplicadas.");
-        }
-        setRoleModalOpen(false);
-    };
+    const StatusBadge = ({ estado }) => (
+        <span className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full w-fit ${
+            estado === 'activo' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+        }`}>
+            {estado === 'activo' ? <CheckCircle size={12}/> : <XCircle size={12}/>}
+            {estado === 'activo' ? 'Acceso Permitido' : 'Acceso Bloqueado'}
+        </span>
+    );
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
+        <div className="space-y-6 animate-in fade-in duration-500">
+
+            {/* Header de la Página */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-800">Seguridad y Acceso</h2>
-                    <p className="text-gray-500">Gestión integral de usuarios, roles y permisos</p>
+                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <Shield className="text-blue-600" /> Administración de Usuarios
+                    </h1>
+                    <p className="text-slate-500 text-sm">Gestión de accesos, roles y auditoría de personal.</p>
                 </div>
+                <Button variant="primary" className="shadow-lg shadow-blue-500/20">
+                    <UserPlus size={18} className="mr-2" /> Nuevo Usuario
+                </Button>
             </div>
 
-            {/* TABS */}
-            <div className="flex gap-2 border-b border-gray-200">
-                <button onClick={() => setActiveTab('usuarios')} className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'usuarios' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`}>
-                    <User size={16} className="inline mr-2"/> Usuarios
-                </button>
-                <button onClick={() => setActiveTab('roles')} className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'roles' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`}>
-                    <Shield size={16} className="inline mr-2"/> Roles y Permisos
-                </button>
-            </div>
+            {/* Barra de Búsqueda y Filtros */}
+            <Card className="p-4 bg-white shadow-sm border border-slate-200">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                    <input
+                        type="text"
+                        placeholder="Buscar por nombre, rol o email..."
+                        className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        value={busqueda}
+                        onChange={(e) => setBusqueda(e.target.value)}
+                    />
+                </div>
+            </Card>
 
-            {/* TAB 1: USUARIOS */}
-            {activeTab === 'usuarios' && (
-                <Card>
-                    <CardHeader className="flex flex-row justify-between items-center">
-                        <CardTitle>Usuarios del Sistema</CardTitle>
-                        <Button variant="primary" onClick={() => { setSelectedUser(null); setUserModalOpen(true); }}>
-                            <Plus size={16}/> Nuevo Usuario
-                        </Button>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHead><TableRow><TableHeader>Usuario</TableHeader><TableHeader>Rol</TableHeader><TableHeader>Estado</TableHeader><TableHeader>Acciones</TableHeader></TableRow></TableHead>
-                            <TableBody>
-                                {usuarios.map(u => (
-                                    <TableRow key={u.id} className={u.estado === 'Inactivo' ? 'bg-gray-50 opacity-60' : ''}>
-                                        <TableCell>
-                                            <div className="font-bold">{u.nombre}</div>
-                                            <div className="text-xs text-gray-400 flex items-center gap-1"><Mail size={10}/> {u.email}</div>
-                                        </TableCell>
-                                        <TableCell><Badge variant="outline">{u.rol}</Badge></TableCell>
-                                        <TableCell>{u.estado === 'Activo' ? <Badge variant="success">Activo</Badge> : <Badge variant="danger">Inactivo</Badge>}</TableCell>
-                                        <TableCell>
-                                            <div className="flex gap-2">
-                                                <button onClick={() => { setSelectedUser(u); setUserModalOpen(true); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded border" title="Editar"><Edit size={16}/></button>
-                                                <button onClick={() => handleResetPassword(u.email)} className="p-1.5 text-orange-600 hover:bg-orange-50 rounded border" title="Reset Clave"><Key size={16}/></button>
-                                                <button onClick={() => handleToggleStatus(u.id, u.estado)} className="p-1.5 text-red-600 hover:bg-red-50 rounded border" title="Activar/Desactivar"><UserX size={16}/></button>
-                                                <button onClick={() => { setSelectedUser(u); setAuditModalOpen(true); }} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded border" title="Auditar Permisos"><Eye size={16}/></button>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-            )}
+            {/* Tabla de Usuarios */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-200">
+                        <tr>
+                            <th className="p-4">Usuario</th>
+                            <th className="p-4">Rol / Permisos</th>
+                            <th className="p-4">Estado Actual</th>
+                            <th className="p-4">Última Sesión</th>
+                            <th className="p-4 text-right">Acciones</th>
+                        </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                        {usuariosFiltrados.map((user) => (
+                            <tr key={user.id} className="hover:bg-slate-50 transition-colors group">
+                                <td className="p-4">
+                                    <div className="font-bold text-slate-800">{user.nombre}</div>
+                                    <div className="text-xs text-slate-400">{user.email}</div>
+                                </td>
+                                <td className="p-4">
+                                    <RoleBadge rol={user.rol} />
+                                </td>
+                                <td className="p-4">
+                                    <StatusBadge estado={user.estado} />
+                                </td>
+                                <td className="p-4 text-slate-500 tabular-nums">
+                                    {user.ultimoAcceso}
+                                </td>
+                                <td className="p-4 text-right">
+                                    <div className="flex justify-end gap-2">
+                                        {/* Botón Editar */}
+                                        <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar datos">
+                                            <Edit size={18} />
+                                        </button>
 
-            {/* TAB 2: ROLES (CON MATRIZ DE PERMISOS) */}
-            {activeTab === 'roles' && (
-                <Card>
-                    <CardHeader className="flex flex-row justify-between items-center">
-                        <CardTitle>Definición de Roles</CardTitle>
-                        <Button variant="primary" onClick={() => handleOpenRoleModal(null)}>
-                            <Plus size={16}/> Crear Rol
-                        </Button>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHead><TableRow><TableHeader>Rol</TableHeader><TableHeader>Usuarios Asignados</TableHeader><TableHeader>Versión Política</TableHeader><TableHeader>Acciones</TableHeader></TableRow></TableHead>
-                            <TableBody>
-                                {rolesDefinidos.map(r => (
-                                    <TableRow key={r.id}>
-                                        <TableCell className="font-bold">{r.nombre}</TableCell>
-                                        <TableCell>{r.usuarios}</TableCell>
-                                        <TableCell><span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">{r.version}</span></TableCell>
-                                        <TableCell>
-                                            <button onClick={() => handleOpenRoleModal(r)} className="text-blue-600 hover:underline text-sm font-medium flex items-center gap-1">
-                                                <List size={14}/> Configurar Permisos
-                                            </button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* MODAL USUARIO */}
-            <Modal isOpen={userModalOpen} onClose={() => setUserModalOpen(false)} title={selectedUser ? "Editar Usuario" : "Crear Usuario"}>
-                <form onSubmit={handleSaveUser} className="space-y-4">
-                    <Input name="nombre" label="Nombre" defaultValue={selectedUser?.nombre} required />
-                    <Input name="email" label="Email" defaultValue={selectedUser?.email} required />
-                    <div className="flex flex-col gap-1">
-                        <label className="text-sm font-semibold text-gray-700">Rol</label>
-                        <select name="rol" className="p-2 border rounded-lg bg-white" defaultValue={selectedUser?.rol || ''}>
-                            {rolesDefinidos.map(r => <option key={r.id} value={r.nombre}>{r.nombre}</option>)}
-                        </select>
-                    </div>
-                    <div className="flex justify-end gap-2 mt-4"><Button variant="secondary" onClick={() => setUserModalOpen(false)}>Cancelar</Button><Button type="submit" variant="primary">Guardar</Button></div>
-                </form>
-            </Modal>
-
-            {/* MODAL ROL (MATRIZ DE PERMISOS) - AQUÍ ESTÁ LA CLAVE DEL CASO DE USO */}
-            <Modal isOpen={roleModalOpen} onClose={() => setRoleModalOpen(false)} title={selectedRole ? `Editar Política: ${selectedRole.nombre}` : "Nuevo Rol"}>
-                <form onSubmit={handleSaveRole} className="space-y-4">
-                    <Input label="Nombre del Rol" defaultValue={selectedRole?.nombre} />
-                    <Alert variant="info" title="Control de Versiones">
-                        Al guardar, se generará una nueva versión y se auditará el cambio.
-                    </Alert>
-
-                    <div className="border rounded-lg overflow-hidden">
-                        <table className="w-full text-xs text-left">
-                            <thead className="bg-gray-100 font-bold text-gray-600">
-                            <tr><th className="p-2">Módulo</th><th className="p-2 text-center">Leer</th><th className="p-2 text-center">Crear</th><th className="p-2 text-center">Editar</th><th className="p-2 text-center">Eliminar</th></tr>
-                            </thead>
-                            <tbody className="divide-y">
-                            {['Ventas', 'Logística', 'Almacén', 'Admin'].map(mod => (
-                                <tr key={mod}>
-                                    <td className="p-2 font-medium">{mod}</td>
-                                    <td className="p-2 text-center"><input type="checkbox" defaultChecked /></td>
-                                    <td className="p-2 text-center"><input type="checkbox" defaultChecked={mod !== 'Admin'} /></td>
-                                    <td className="p-2 text-center"><input type="checkbox" defaultChecked={mod !== 'Admin'} /></td>
-                                    <td className="p-2 text-center"><input type="checkbox" /></td>
-                                </tr>
-                            ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div className="flex justify-end gap-2 mt-4"><Button variant="secondary" onClick={() => setRoleModalOpen(false)}>Cancelar</Button><Button type="submit" variant="primary">Guardar Política</Button></div>
-                </form>
-            </Modal>
-
-            {/* MODAL AUDITORÍA (PERMISOS EFECTIVOS) */}
-            <Modal isOpen={auditModalOpen} onClose={() => setAuditModalOpen(false)} title="Auditoría de Permisos Efectivos">
-                <div className="space-y-4">
-                    <div className="flex items-center gap-3 mb-4 bg-gray-50 p-3 rounded border">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center font-bold text-blue-600">{selectedUser?.nombre.charAt(0)}</div>
-                        <div><h4 className="font-bold">{selectedUser?.nombre}</h4><p className="text-xs text-gray-500">Rol: {selectedUser?.rol}</p></div>
-                    </div>
-
-                    <h4 className="text-xs font-bold text-gray-500 uppercase border-b pb-1">Lista de Permisos Efectivos (Calculado)</h4>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {['ventas.read', 'ventas.write', 'logistica.read', 'almacen.read'].map(p => (
-                            <div key={p} className="flex justify-between items-center text-sm"><span className="font-mono">{p}</span><span className="text-green-600 text-xs font-bold">CONCEDIDO</span></div>
+                                        {/* Botón DAR DE BAJA / REACTIVAR */}
+                                        <button
+                                            onClick={() => toggleEstadoUsuario(user.id)}
+                                            className={`p-2 rounded-lg transition-colors border ${
+                                                user.estado === 'activo'
+                                                    ? 'text-red-500 border-red-100 hover:bg-red-50 hover:border-red-200'
+                                                    : 'text-green-600 border-green-100 hover:bg-green-50 hover:border-green-200'
+                                            }`}
+                                            title={user.estado === 'activo' ? "Dar de baja (Bloquear acceso)" : "Reactivar acceso"}
+                                        >
+                                            {user.estado === 'activo' ? <UserX size={18} /> : <CheckCircle size={18} />}
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
                         ))}
-                        <div className="flex justify-between items-center text-sm"><span className="font-mono text-gray-400">admin.delete</span><span className="text-red-500 text-xs font-bold">DENEGADO (Política)</span></div>
-                    </div>
-                    <Button className="w-full mt-2" onClick={() => setAuditModalOpen(false)}>Cerrar Auditoría</Button>
+                        </tbody>
+                    </table>
                 </div>
-            </Modal>
 
+                {usuariosFiltrados.length === 0 && (
+                    <div className="p-8 text-center text-slate-400">
+                        No se encontraron usuarios con ese criterio.
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

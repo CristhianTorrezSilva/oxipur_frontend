@@ -7,19 +7,19 @@ import Footer from './Footer.jsx';
 const MainLayout = () => {
     return (
         <div className="flex h-screen bg-slate-50 overflow-hidden">
-            {/* Sidebar fijo a la izquierda */}
+            {/* Navegación Lateral (Fija) */}
             <Sidebar />
 
-            {/* Contenedor principal a la derecha */}
+            {/* Wrapper del Contenido */}
             <div className="flex-1 flex flex-col ml-64 min-w-0 transition-all duration-300">
 
-                {/* Header fijo arriba */}
+                {/* Barra Superior */}
                 <Header />
 
-                {/* Área de contenido con scroll */}
+                {/* Área de Trabajo (Scrollable) */}
                 <main className="flex-1 overflow-y-auto p-6 scroll-smooth">
                     <div className="max-w-7xl mx-auto min-h-[calc(100vh-140px)]">
-                        {/* Aquí se renderizan las páginas (NuevoPedido, Dashboard, etc.) */}
+                        {/* Inyección de vistas dinámicas */}
                         <Outlet />
                     </div>
                     <Footer />
