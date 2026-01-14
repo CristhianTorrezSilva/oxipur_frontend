@@ -82,10 +82,13 @@ Sigue estos pasos para levantar el entorno de desarrollo localmente:
 
 ---
 
-## 👨‍💻 Autor
+## 👨‍💻 Autores
 
 **Cristhian Torrez Silva**  
 *Jr Penetration Tester & Dev Jr*
 
+**Guillermo Torres**  
+*Dev Jr*
+
 ---
-*Este proyecto es parte de mi portafolio, demostrando un enfoque proactivo en seguridad y desarrollo de software.*
+*Este proyecto es parte de nuestro portafolio, demostrando un enfoque proactivo en seguridad y desarrollo de software.*
